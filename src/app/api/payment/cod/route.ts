@@ -5,9 +5,11 @@ import Order from '@/lib/models/Order';
 import { updateStockForOrder } from '@/lib/db/queries';
 
 function generateOrderNumber() {
-    const ts = Date.now().toString(36).toUpperCase();
-    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `VC-${ts}-${rand}`;
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const random6 = Math.floor(100000 + Math.random() * 900000);
+    return `VC-${day}${month}-${random6}`;
 }
 
 export async function POST(req: NextRequest) {

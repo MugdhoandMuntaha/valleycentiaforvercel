@@ -11,13 +11,18 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         async function load() {
-            const products = await getAdminProducts();
-            setStats({
-                total: products.length,
-                active: products.filter(p => p.is_active).length,
-                outOfStock: products.filter(p => !p.in_stock || p.stock_quantity === 0).length,
-            });
-            setLoading(false);
+            try {
+                const products = await getAdminProducts();
+                setStats({
+                    total: products.length,
+                    active: products.filter(p => p.is_active).length,
+                    outOfStock: products.filter(p => !p.in_stock || p.stock_quantity === 0).length,
+                });
+            } catch (err) {
+                console.error('Error loading dashboard stats:', err);
+            } finally {
+                setLoading(false);
+            }
         }
         load();
     }, []);

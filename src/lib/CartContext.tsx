@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ShoppingBag, Trash2, X } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 /* ===== Toast Types ===== */
 interface Toast {
@@ -117,6 +118,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const toastCounter = useRef(0);
 
+    const { user } = useAuth();
+    const hasSyncedInit = useRef(false);
+
     // Load from localStorage on mount
     useEffect(() => {
         try {
@@ -129,6 +133,63 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
         setIsHydrated(true);
     }, []);
+
+    // Load/merge from database when user logs in
+    useEffect(() => {
+        if (!isHydrated) return;
+
+        async function syncCartWithDb() {
+            if (user) {
+                try {
+                    // Fetch cart items from DB
+                    const res = await fetch('/api/cart');
+                    if (res.ok) {
+                        const data = await res.json();
+                        const dbItems = data.items || [];
+                        
+                        if (dbItems.length > 0 && items.length === 0) {
+                            // If local cart is empty, restore DB cart
+                            setItems(dbItems);
+                        } else if (items.length > 0) {
+                            // If local cart has items, sync it to DB
+                            await fetch('/api/cart', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ items }),
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error syncing cart with database:', err);
+                } finally {
+                    hasSyncedInit.current = true;
+                }
+            } else {
+                hasSyncedInit.current = false;
+            }
+        }
+
+        syncCartWithDb();
+    }, [user, isHydrated]);
+
+    // Upload items to DB when they change (only after initial sync is done)
+    useEffect(() => {
+        if (!isHydrated || !user || !hasSyncedInit.current) return;
+
+        const timeout = setTimeout(async () => {
+            try {
+                await fetch('/api/cart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items }),
+                });
+            } catch (err) {
+                console.error('Failed to sync cart updates to database:', err);
+            }
+        }, 1000); // Debounce DB requests
+
+        return () => clearTimeout(timeout);
+    }, [items, user, isHydrated]);
 
     // Persist to localStorage on change
     useEffect(() => {
