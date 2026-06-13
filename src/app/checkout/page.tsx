@@ -482,10 +482,8 @@ export default function CheckoutPage() {
                 )} */}
                 
 
-                {/* ── Left Column ── */}
-                <div className="co-left">
-                    {/* Step 1: Address */}
-                    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                {/* Step 1: Address */}
+                <motion.div className="co-address-section" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                         <div ref={addressSectionRef} className="co-card">
                             <div className="co-step-header">
                                 <div className="co-step-num">1</div>
@@ -735,7 +733,6 @@ export default function CheckoutPage() {
                         );
                     })}
                     </div>
-                </div>
 
                 {/* ── Right Column: Summary ── */}
                 <motion.div
@@ -1106,11 +1103,33 @@ export default function CheckoutPage() {
                     display: grid;
                     grid-template-columns: 1fr 360px;
                     gap: 24px;
-                    align-items: start;
+                    align-items: stretch;
                     box-sizing: border-box;
                 }
-                .co-left { display: flex; flex-direction: column; gap: 18px; }
-                .co-summary-wrap { position: sticky; top: 20px; }
+                .co-address-section {
+                    grid-column: 1;
+                    grid-row: 1;
+                    height: 100%;
+                }
+                .co-address-section .co-card {
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .co-checkout-items {
+                    grid-column: 1;
+                    grid-row: 2;
+                }
+                .co-summary-wrap {
+                    grid-column: 2;
+                    grid-row: 1;
+                    height: 100%;
+                }
+                .co-summary-wrap .co-card {
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                }
 
                 /* ────── Card ────── */
                 .co-card {
@@ -1404,6 +1423,14 @@ export default function CheckoutPage() {
                     .co-trust { gap: 16px; }
                     .co-checkout-items { display: none !important; }
                     .co-hide-mobile { display: none !important; }
+                    .co-address-section, .co-summary-wrap, .co-checkout-items {
+                        grid-column: auto;
+                        grid-row: auto;
+                        height: auto;
+                    }
+                    .co-address-section .co-card, .co-summary-wrap .co-card {
+                        height: auto;
+                    }
                 }
 
                 /* ────── Small Mobile (≤480px) ────── */

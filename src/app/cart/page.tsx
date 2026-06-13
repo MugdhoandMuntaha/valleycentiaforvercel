@@ -302,10 +302,11 @@ export default function CartPage() {
                                         </div>
 
                                         {/* Quantity + Remove */}
-                                        <div className="cart-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                        <div className="cart-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'nowrap' }}>
                                             <div style={{
                                                 display: 'flex', alignItems: 'center',
                                                 border: '1.5px solid #e0e0e0', borderRadius: '10px', overflow: 'hidden',
+                                                flexShrink: 0,
                                             }}>
                                                 <button
                                                     onClick={() => {
@@ -352,6 +353,7 @@ export default function CartPage() {
                                                     background: 'none', border: 'none', color: '#ef4444', fontSize: '13px',
                                                     fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif",
                                                     transition: 'opacity 0.2s', padding: '4px 0',
+                                                    flexShrink: 0,
                                                 }}
                                                 onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
                                                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
