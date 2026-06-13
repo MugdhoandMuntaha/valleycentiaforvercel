@@ -3,16 +3,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowLeft, MapPin, CreditCard, Loader2, Plus, Shield, Truck, Package,
-    Home, Briefcase, Check, X, Lock, Wallet, Edit3, Trash2, Save, Tag,
+    Home, Briefcase, Check, X, Lock, Wallet, Edit3, Trash2, Save, Tag, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useCart } from '@/lib/CartContext';
 import { CheckoutPageSkeleton } from '@/components/Skeletons';
-import { getUserAddresses, createAddress, updateAddress, deleteAddress, getSiteSetting } from '@/lib/db/queries';
-import type { UserAddress, AddressFormData } from '@/lib/db/queries';
+import { getUserAddresses, createAddress, updateAddress, deleteAddress, getSiteSetting, getActiveCoupons } from '@/lib/db/queries';
+import type { UserAddress, AddressFormData, CouponData } from '@/lib/db/queries';
 
 const emptyAddress: AddressFormData = {
     label: 'Home', full_name: '', phone: '', address_line_1: '',
@@ -22,7 +22,7 @@ const emptyAddress: AddressFormData = {
 
 export default function CheckoutPage() {
     const { user, loading: authLoading } = useAuth();
-    const { items, totalPrice, clearCart, isHydrated } = useCart();
+    const { items, totalPrice, clearCart, isHydrated, updateQuantity, removeFromCart } = useCart();
     const router = useRouter();
 
     const [addresses, setAddresses] = useState<UserAddress[]>([]);
@@ -123,6 +123,8 @@ export default function CheckoutPage() {
     const [shippingFeeOutside, setShippingFeeOutside] = useState(150);
     const [promoCode, setPromoCode] = useState<string | null>(null);
     const [promoDiscount, setPromoDiscount] = useState(0);
+    const [availableCoupons, setAvailableCoupons] = useState<CouponData[]>([]);
+    const [showCouponSelector, setShowCouponSelector] = useState(false);
 
     const selectedAddress = user
         ? addresses.find(a => a.id === selectedAddr)
@@ -144,6 +146,11 @@ export default function CheckoutPage() {
             if (f?.outside_dhaka) setShippingFeeOutside(f.outside_dhaka);
             if (!f?.dhaka && f?.amount) { setShippingFeeDhaka(f.amount); setShippingFeeOutside(f.amount); }
         }).catch(() => { });
+
+        // Fetch coupons
+        getActiveCoupons().then(data => {
+            setAvailableCoupons(data || []);
+        }).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -158,6 +165,66 @@ export default function CheckoutPage() {
             }
         } catch { /* ignore */ }
     }, []);
+
+    const handleApplyCoupon = (coupon: CouponData) => {
+        let discount = 0;
+        if (coupon.discount_type === 'percentage') {
+            discount = Math.ceil((totalPrice * coupon.discount_value) / 100);
+            if (coupon.max_discount_amount && discount > coupon.max_discount_amount) {
+                discount = coupon.max_discount_amount;
+            }
+        } else {
+            discount = coupon.discount_value;
+        }
+        
+        setPromoCode(coupon.code);
+        setPromoDiscount(discount);
+        setShowCouponSelector(false);
+        
+        try {
+            sessionStorage.setItem('checkout_coupon', JSON.stringify({
+                code: coupon.code,
+                discount: discount
+            }));
+        } catch { /* ignore */ }
+    };
+
+    const handleRemoveCoupon = () => {
+        setPromoCode(null);
+        setPromoDiscount(0);
+        try {
+            sessionStorage.removeItem('checkout_coupon');
+        } catch { /* ignore */ }
+    };
+
+    // Recalculate coupon discount if subtotal (totalPrice) changes
+    useEffect(() => {
+        if (promoCode && availableCoupons.length > 0) {
+            const activeCoupon = availableCoupons.find(c => c.code === promoCode);
+            if (activeCoupon) {
+                if (totalPrice < activeCoupon.minimum_order_value) {
+                    handleRemoveCoupon();
+                } else {
+                    let discount = 0;
+                    if (activeCoupon.discount_type === 'percentage') {
+                        discount = Math.ceil((totalPrice * activeCoupon.discount_value) / 100);
+                        if (activeCoupon.max_discount_amount && discount > activeCoupon.max_discount_amount) {
+                            discount = activeCoupon.max_discount_amount;
+                        }
+                    } else {
+                        discount = activeCoupon.discount_value;
+                    }
+                    setPromoDiscount(discount);
+                    try {
+                        sessionStorage.setItem('checkout_coupon', JSON.stringify({
+                            code: activeCoupon.code,
+                            discount: discount
+                        }));
+                    } catch { /* ignore */ }
+                }
+            }
+        }
+    }, [totalPrice, promoCode, availableCoupons]);
 
     useEffect(() => {
         if (isHydrated && !authLoading && items.length === 0 && !navigatingAway.current) {
@@ -359,10 +426,58 @@ export default function CheckoutPage() {
 
             {/* ── Main Layout ── */}
             <div className="co-layout">
+                {/* Free Shipping Progress Bar */}
+                {totalPrice > 0 && (
+                    <div style={{
+                        gridColumn: '1 / -1',
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '12px',
+                        padding: '12px 18px',
+                        marginBottom: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        fontSize: '13px',
+                        color: '#78350f',
+                        fontWeight: 600,
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Truck size={16} color="#d97706" />
+                                {totalPrice >= freeShippingThreshold ? (
+                                    <span>🎉 Congratulations! You have qualified for <strong>FREE shipping</strong>!</span>
+                                ) : (
+                                    <span>
+                                        Add <strong>৳{(freeShippingThreshold - totalPrice).toLocaleString()}</strong> more for <strong>FREE shipping!</strong>
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{
+                            width: '100%',
+                            height: '6px',
+                            background: '#f3f4f6',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            marginTop: '2px'
+                        }}>
+                            <div style={{
+                                width: `${Math.min((totalPrice / freeShippingThreshold) * 100, 100)}%`,
+                                height: '100%',
+                                background: '#f5c518',
+                                borderRadius: '10px',
+                                transition: 'width 0.4s ease-out'
+                            }} />
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Left Column ── */}
                 <div className="co-left">
-
                     {/* Step 1: Address */}
                     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                         <div ref={addressSectionRef} className="co-card">
@@ -605,37 +720,106 @@ export default function CheckoutPage() {
                         </div>
                     </motion.div>
 
-                    {/* Step 2: Order Items */}
-                    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-                        <div className="co-card">
-                            <div className="co-step-header">
-                                <div className="co-step-num">2</div>
-                                <h2 className="co-step-title">Order Items ({items.length})</h2>
-                            </div>
-                            <div className="co-items">
-                                {items.map((item, i) => {
-                                    const key = item.size ? `${item.id}-${item.size}` : item.id;
-                                    return (
-                                        <div key={key} className={`co-item${i < items.length - 1 ? ' co-item--border' : ''}`}>
-                                            <div className="co-item-img">
-                                                <img src={item.image} alt={item.name} />
-                                            </div>
-                                            <div className="co-item-info">
-                                                <div className="co-item-top-row">
-                                                    <div className="co-item-name">{item.name}</div>
-                                                    <div className="co-item-price">৳{(item.price * item.quantity).toLocaleString()}</div>
+                    {/* Interactive Order Items */}
+                    {items.map((item) => {
+                        const key = item.size ? `${item.id}-${item.size}` : item.id;
+                        const discount = item.originalPrice ? Math.ceil(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0;
+                        return (
+                            <motion.div
+                                key={key}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="co-card"
+                                style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', padding: '20px 24px', marginTop: '14px' }}
+                            >
+                                <div style={{ width: '84px', height: '84px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0, background: '#f9f9f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <img src={item.image} alt={item.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0', fontFamily: "'Inter', sans-serif", lineHeight: 1.4 }}>
+                                                {item.name}
+                                            </h3>
+                                            {item.size && (
+                                                <div style={{ marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '11px', color: '#666', background: '#f0f0f0', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                                                        Size: {item.size}
+                                                    </span>
                                                 </div>
-                                                <div className="co-item-meta">
-                                                    {item.size && <span className="co-item-size">Size: {item.size}</span>}
-                                                    <span className="co-item-qty">Qty: {item.quantity}</span>
-                                                </div>
+                                            )}
+                                            
+                                            {/* Price Row */}
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
+                                                    ৳{item.price.toLocaleString()}
+                                                </span>
+                                                {item.originalPrice && (
+                                                    <>
+                                                        <span style={{ fontSize: '13px', color: '#aaa', textDecoration: 'line-through' }}>
+                                                            ৳{Math.ceil(item.originalPrice).toLocaleString()}
+                                                        </span>
+                                                        {discount > 0 && (
+                                                            <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 700 }}>
+                                                                {discount}% OFF
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </motion.div>
+                                        
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
+                                                ৳{(item.price * item.quantity).toLocaleString()}
+                                            </span>
+                                            {item.quantity > 1 && (
+                                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                                                    ৳{item.price.toLocaleString()} × {item.quantity}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Action Row: Quantity Selector + Remove Button */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden', height: '32px', background: '#fff' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateQuantity(item.id, item.quantity - 1, item.size)}
+                                                disabled={item.quantity <= 1}
+                                                style={{ width: '32px', height: '100%', border: 'none', background: 'none', cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.quantity <= 1 ? '#ccc' : '#666', outline: 'none' }}
+                                            >
+                                                -
+                                            </button>
+                                            <span style={{ width: '36px', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: '#1a1a1a' }}>
+                                                {item.quantity}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateQuantity(item.id, item.quantity + 1, item.size)}
+                                                disabled={item.quantity >= (item.stockQuantity || 999)}
+                                                style={{ width: '32px', height: '100%', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', outline: 'none' }}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => removeFromCart(item.id, item.size)}
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', background: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: 600, color: '#ef4444', borderRadius: '6px', transition: 'background 0.2s' }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                        >
+                                            <Trash2 size={13} /> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
 
                 {/* ── Right Column: Summary ── */}
@@ -647,6 +831,171 @@ export default function CheckoutPage() {
                 >
                     <div className="co-card">
                         <h3 className="co-summary-title">Order Summary</h3>
+
+                        {/* Coupon Selector */}
+                        <div style={{ position: 'relative', marginBottom: '16px', marginTop: '6px' }}>
+                            <div
+                                onClick={() => setShowCouponSelector(!showCouponSelector)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '10px',
+                                    padding: '10px 14px',
+                                    cursor: 'pointer',
+                                    background: '#f8fafc',
+                                    transition: 'all 0.2s',
+                                    userSelect: 'none'
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                    e.currentTarget.style.background = '#f1f5f9';
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                    e.currentTarget.style.background = '#f8fafc';
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px', fontWeight: 500 }}>
+                                    <Tag size={15} style={{ color: '#94a3b8' }} />
+                                    {promoCode ? (
+                                        <span style={{ color: '#0f172a', fontWeight: 700 }}>
+                                            {promoCode} Applied
+                                        </span>
+                                    ) : (
+                                        <span>
+                                            {availableCoupons.length > 0
+                                                ? `${availableCoupons.length} coupons available`
+                                                : 'Apply Coupon'
+                                            }
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {promoCode && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemoveCoupon();
+                                            }}
+                                            style={{
+                                                border: 'none',
+                                                background: 'none',
+                                                color: '#ef4444',
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                    <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                                        <ChevronDown size={14} style={{ transform: showCouponSelector ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Dropdown list of available coupons */}
+                            <AnimatePresence>
+                                {showCouponSelector && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                        transition={{ duration: 0.15 }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: 0,
+                                            right: 0,
+                                            background: '#fff',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '12px',
+                                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                                            zIndex: 50,
+                                            marginTop: '6px',
+                                            maxHeight: '220px',
+                                            overflowY: 'auto',
+                                            padding: '8px'
+                                        }}
+                                    >
+                                        {availableCoupons.length === 0 ? (
+                                            <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: '#94a3b8' }}>
+                                                No coupons available right now
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                {availableCoupons.map((coupon) => {
+                                                    const isEligible = totalPrice >= coupon.minimum_order_value;
+                                                    const isSelected = promoCode === coupon.code;
+                                                    return (
+                                                        <div
+                                                            key={coupon.id}
+                                                            onClick={() => {
+                                                                if (isEligible) {
+                                                                    handleApplyCoupon(coupon);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                padding: '10px 12px',
+                                                                borderRadius: '8px',
+                                                                cursor: isEligible ? 'pointer' : 'not-allowed',
+                                                                border: isSelected ? '1.5px solid #f5c518' : '1px solid #f1f5f9',
+                                                                background: isSelected ? 'rgba(245,197,24,0.03)' : (isEligible ? '#fff' : '#f8fafc'),
+                                                                opacity: isEligible ? 1 : 0.6,
+                                                                transition: 'all 0.15s'
+                                                            }}
+                                                            onMouseEnter={e => {
+                                                                if (isEligible && !isSelected) {
+                                                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                                                    e.currentTarget.style.background = '#f8fafc';
+                                                                }
+                                                            }}
+                                                            onMouseLeave={e => {
+                                                                if (isEligible && !isSelected) {
+                                                                    e.currentTarget.style.borderColor = '#f1f5f9';
+                                                                    e.currentTarget.style.background = '#fff';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                                                                <span style={{ fontSize: '13px', fontWeight: 800, color: isEligible ? '#1e293b' : '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                                                                    {coupon.code}
+                                                                </span>
+                                                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#0d6b3d' }}>
+                                                                    {coupon.discount_type === 'percentage'
+                                                                        ? `${coupon.discount_value}% OFF`
+                                                                        : `৳${coupon.discount_value} OFF`
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                            <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px 0', lineHeight: 1.3 }}>
+                                                                {coupon.description}
+                                                            </p>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+                                                                <span>Min. spend: ৳{coupon.minimum_order_value}</span>
+                                                                {!isEligible && (
+                                                                    <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                                                                        Needs ৳{(coupon.minimum_order_value - totalPrice).toLocaleString()} more
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
 
                         <div className="co-summary-rows">
                             <div className="co-summary-row">

@@ -633,7 +633,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             size: currentSize.label,
             stockQuantity: currentSize.stockQuantity,
         }, quantity);
-        router.push('/cart');
+        router.push('/checkout');
     };
 
     // Reset the "Added" toast after 2 seconds

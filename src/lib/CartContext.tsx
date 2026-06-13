@@ -222,7 +222,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const existing = prev.find(
                 (i) => (i.size ? `${i.id}-${i.size}` : i.id) === key
             );
-            const maxStock = item.stockQuantity !== undefined ? item.stockQuantity : 10;
+            const maxStock = item.stockQuantity !== undefined ? item.stockQuantity : 999;
             if (existing) {
                 return prev.map((i) =>
                     (i.size ? `${i.id}-${i.size}` : i.id) === key
@@ -256,7 +256,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const key = size ? `${id}-${size}` : id;
             return prev.map((i) => {
                 if ((i.size ? `${i.id}-${i.size}` : i.id) === key) {
-                    const maxStock = i.stockQuantity !== undefined ? i.stockQuantity : 10;
+                    const maxStock = i.stockQuantity !== undefined ? i.stockQuantity : 999;
                     return { ...i, quantity: Math.min(quantity, maxStock) };
                 }
                 return i;
