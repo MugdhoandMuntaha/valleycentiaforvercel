@@ -38,15 +38,10 @@ export default function CheckoutPage() {
     const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('cod');
     const navigatingAway = useRef(false);
     const [guestEmail, setGuestEmail] = useState('');
-    const [guestAddress, setGuestAddress] = useState<AddressFormData>({
-        label: 'Home', full_name: '', phone: '', address_line_1: '',
-        address_line_2: '', city: '', state: '', postal_code: '', country: 'Bangladesh',
-        landmark: '', is_default: false,
-    });
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [detectingLocation, setDetectingLocation] = useState(false);
 
-    const handleDetectLocation = (target: 'guest' | 'form') => {
+    const handleDetectLocation = () => {
         if (typeof window !== 'undefined' && !window.isSecureContext) {
             setError('Auto-detect requires a secure (HTTPS) connection on mobile devices. Please enter address details manually or use an HTTPS connection.');
             return;
@@ -64,7 +59,7 @@ export default function CheckoutPage() {
                 try {
                     const res = await fetch(`/api/geocode?lat=${latitude}&lon=${longitude}`);
                     const data = await res.json();
-                    
+
                     if (data && data.address) {
                         const addr = data.address;
                         const road = addr.road || addr.street || '';
@@ -86,17 +81,10 @@ export default function CheckoutPage() {
                             country: country,
                         };
 
-                        if (target === 'guest') {
-                            setGuestAddress(prev => ({
-                                ...prev,
-                                ...mapped,
-                            }));
-                        } else {
-                            setAddrForm(prev => ({
-                                ...prev,
-                                ...mapped,
-                            }));
-                        }
+                        setAddrForm(prev => ({
+                            ...prev,
+                            ...mapped,
+                        }));
                     } else {
                         setError('Could not retrieve address details for your coordinates.');
                     }
@@ -126,9 +114,7 @@ export default function CheckoutPage() {
     const [availableCoupons, setAvailableCoupons] = useState<CouponData[]>([]);
     const [showCouponSelector, setShowCouponSelector] = useState(false);
 
-    const selectedAddress = user
-        ? addresses.find(a => a.id === selectedAddr)
-        : guestAddress;
+    const selectedAddress = addrForm;
     const isDhaka = selectedAddress?.city?.toLowerCase().includes('dhaka') ?? false;
     const shippingFee = isDhaka ? shippingFeeDhaka : shippingFeeOutside;
     const shipping = totalPrice >= freeShippingThreshold ? 0 : shippingFee;
@@ -150,7 +136,7 @@ export default function CheckoutPage() {
         // Fetch coupons
         getActiveCoupons().then(data => {
             setAvailableCoupons(data || []);
-        }).catch(() => {});
+        }).catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -176,11 +162,11 @@ export default function CheckoutPage() {
         } else {
             discount = coupon.discount_value;
         }
-        
+
         setPromoCode(coupon.code);
         setPromoDiscount(discount);
         setShowCouponSelector(false);
-        
+
         try {
             sessionStorage.setItem('checkout_coupon', JSON.stringify({
                 code: coupon.code,
@@ -237,6 +223,26 @@ export default function CheckoutPage() {
         setAddrLoading(true);
         const data = await getUserAddresses(user.id);
         setAddresses(data);
+        
+        // Auto fill form with default or first address
+        const defaultAddr = data.find(a => a.is_default) || data[0];
+        if (defaultAddr) {
+            setSelectedAddr(defaultAddr.id);
+            setAddrForm({
+                label: defaultAddr.label || 'Home',
+                full_name: defaultAddr.full_name || '',
+                phone: defaultAddr.phone || '',
+                address_line_1: defaultAddr.address_line_1 || '',
+                address_line_2: defaultAddr.address_line_2 || '',
+                city: defaultAddr.city || '',
+                state: defaultAddr.state || '',
+                postal_code: defaultAddr.postal_code || '',
+                country: defaultAddr.country || 'Bangladesh',
+                landmark: defaultAddr.landmark || '',
+                is_default: defaultAddr.is_default || false,
+            });
+            setEditingAddrId(defaultAddr.id);
+        }
         setAddrLoading(false);
     }, [user]);
 
@@ -248,52 +254,56 @@ export default function CheckoutPage() {
         }
     }, [user, loadAddresses]);
 
-    const openAddrCreate = () => {
-        setEditingAddrId(null);
-        setAddrForm(emptyAddress);
-        setError('');
-        setShowAddrForm(true);
-    };
-
-    const openAddrEdit = (addr: UserAddress) => {
-        setEditingAddrId(addr.id);
-        setAddrForm({
-            label: addr.label, full_name: addr.full_name, phone: addr.phone,
-            address_line_1: addr.address_line_1, address_line_2: addr.address_line_2 || '',
-            city: addr.city, state: addr.state, postal_code: addr.postal_code,
-            country: addr.country, landmark: addr.landmark || '', is_default: addr.is_default,
-        });
-        setError('');
-        setShowAddrForm(true);
-    };
-
     const handleAddrSave = async () => {
         if (!user) return;
-        if (!addrForm.full_name || !addrForm.phone || !addrForm.address_line_1 || !addrForm.city || !addrForm.state || !addrForm.postal_code) {
+        const state = addrForm.state?.trim() || '';
+        const postal_code = addrForm.postal_code?.trim() || '1000';
+        const country = addrForm.country?.trim() || 'Bangladesh';
+        const label = addrForm.label?.trim() || 'Home';
+
+        const updatedAddrForm = {
+            ...addrForm,
+            state,
+            postal_code,
+            country,
+            label,
+        };
+
+        if (!updatedAddrForm.full_name || !updatedAddrForm.phone || !updatedAddrForm.address_line_1 || !updatedAddrForm.city || !updatedAddrForm.state) {
             setError('Please fill all required fields'); return;
         }
         setAddrSaving(true);
         setError('');
+        let newAddrId = editingAddrId;
         if (editingAddrId) {
-            const res = await updateAddress(editingAddrId, user.id, addrForm);
+            const res = await updateAddress(editingAddrId, user.id, updatedAddrForm);
             setAddrSaving(false);
             if (res.error) { setError(res.error); return; }
         } else {
-            const res = await createAddress(user.id, addrForm);
+            const res = await createAddress(user.id, updatedAddrForm);
             setAddrSaving(false);
             if (res.error) { setError(res.error); return; }
-            if (res.id) setSelectedAddr(res.id);
+            if (res.id) {
+                newAddrId = res.id;
+                setSelectedAddr(res.id);
+            }
         }
-        setShowAddrForm(false);
-        setAddrForm(emptyAddress);
-        setEditingAddrId(null);
-        await loadAddresses();
+        const data = await getUserAddresses(user.id);
+        setAddresses(data);
+        if (newAddrId) {
+            setEditingAddrId(newAddrId);
+            setSelectedAddr(newAddrId);
+        }
     };
 
     const handleAddrDelete = async () => {
         if (!deleteConfirmId) return;
         await deleteAddress(deleteConfirmId);
-        if (selectedAddr === deleteConfirmId) setSelectedAddr(null);
+        if (selectedAddr === deleteConfirmId) {
+            setSelectedAddr(null);
+            setEditingAddrId(null);
+            setAddrForm(emptyAddress);
+        }
         setDeleteConfirmId(null);
         await loadAddresses();
     };
@@ -303,40 +313,35 @@ export default function CheckoutPage() {
             setError('You must agree to the Terms of Service and Privacy Policy to place your order.');
             return;
         }
-        let addr;
+        
         let email = '';
         if (user) {
-            if (!selectedAddr) {
-                setShowWarning(true);
-                setShakeWarning(true);
-                setBlinkAddresses(true);
-                addressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(() => {
-                    setShakeWarning(false);
-                    setBlinkAddresses(false);
-                }, 800);
-                setError('Please select a delivery address');
-                return;
-            }
-            addr = addresses.find(a => a.id === selectedAddr);
             email = user.email || '';
         } else {
             if (guestEmail && !guestEmail.includes('@')) {
                 setError('Please enter a valid email address');
                 return;
             }
-            if (!guestAddress.full_name || !guestAddress.phone || !guestAddress.address_line_1 || !guestAddress.city || !guestAddress.state) {
-                setError('Please fill all required shipping fields');
-                return;
-            }
-            addr = {
-                ...guestAddress,
-                postal_code: '1000',
-                country: 'Bangladesh'
-            };
             email = guestEmail || 'guest@valleycentia.com';
         }
-        if (!addr) return;
+
+        const state = addrForm.state?.trim() || '';
+        const postal_code = addrForm.postal_code?.trim() || '1000';
+        const country = addrForm.country?.trim() || 'Bangladesh';
+        const label = addrForm.label?.trim() || 'Home';
+
+        const addr = {
+            ...addrForm,
+            state,
+            postal_code,
+            country,
+            label,
+        };
+
+        if (!addr.full_name || !addr.phone || !addr.address_line_1 || !addr.city || !addr.state) {
+            setError('Please fill all required delivery fields');
+            return;
+        }
 
         setPaying(true);
         setError('');
@@ -419,14 +424,14 @@ export default function CheckoutPage() {
                     <Link href="/cart" className="co-back-link">
                         <ArrowLeft size={15} /> Back to Cart
                     </Link>
-                    <h1 className="co-title">Checkout</h1>
-                    <p className="co-subtitle">Complete your order securely</p>
+                    <h1 className="co-title" style={{color:'black'}}>Checkout</h1>
                 </div>
             </div>
 
             {/* ── Main Layout ── */}
             <div className="co-layout">
-                {/* Free Shipping Progress Bar */}
+                
+                {/* Free Shipping Progress Bar
                 {totalPrice > 0 && (
                     <div style={{
                         gridColumn: '1 / -1',
@@ -474,7 +479,8 @@ export default function CheckoutPage() {
                             }} />
                         </div>
                     </div>
-                )}
+                )} */}
+                
 
                 {/* ── Left Column ── */}
                 <div className="co-left">
@@ -486,16 +492,59 @@ export default function CheckoutPage() {
                                 <h2 className="co-step-title">Delivery Address</h2>
                             </div>
 
-                             {addrLoading ? (
+                            {addrLoading ? (
                                 <div className="co-center-pad">
                                     <Loader2 size={20} color="#f5c518" className="co-spinner" />
                                 </div>
-                            ) : !user ? (
+                            ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                    {/* Select Saved Address Dropdown */}
+                                    {user && addresses.length > 0 && (
+                                        <div style={{ marginBottom: '6px' }}>
+                                            <label className="co-label">Select Saved Address</label>
+                                            <select
+                                                className="co-input"
+                                                value={selectedAddr || ''}
+                                                onChange={e => {
+                                                    const addrId = e.target.value;
+                                                    setSelectedAddr(addrId);
+                                                    const selected = addresses.find(a => a.id === addrId);
+                                                    if (selected) {
+                                                        setAddrForm({
+                                                            label: selected.label || 'Home',
+                                                            full_name: selected.full_name || '',
+                                                            phone: selected.phone || '',
+                                                            address_line_1: selected.address_line_1 || '',
+                                                            address_line_2: selected.address_line_2 || '',
+                                                            city: selected.city || '',
+                                                            state: selected.state || '',
+                                                            postal_code: selected.postal_code || '',
+                                                            country: selected.country || 'Bangladesh',
+                                                            landmark: selected.landmark || '',
+                                                            is_default: selected.is_default || false,
+                                                        });
+                                                        setEditingAddrId(selected.id);
+                                                    } else {
+                                                        setAddrForm(emptyAddress);
+                                                        setEditingAddrId(null);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">-- Choose a saved address --</option>
+                                                {addresses.map(a => (
+                                                    <option key={a.id} value={a.id}>
+                                                        {a.label} ({a.full_name} - {a.city})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Auto Detect Location Button */}
                                     <button
                                         type="button"
                                         disabled={detectingLocation}
-                                        onClick={() => handleDetectLocation('guest')}
+                                        onClick={handleDetectLocation}
                                         style={{
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                             width: '100%', padding: '12px', background: '#fafafa', border: '1.5px solid #e0e0e0',
@@ -519,209 +568,74 @@ export default function CheckoutPage() {
                                         )}
                                     </button>
 
-                                    <div className="co-form-field">
-                                        <label className="co-label">Full Name *</label>
-                                        <input
-                                            value={guestAddress.full_name}
-                                            onChange={e => setGuestAddress(prev => ({ ...prev, full_name: e.target.value }))}
-                                            placeholder="Your name"
-                                            className="co-input"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="co-form-grid">
-                                        <div>
-                                            <label className="co-label">Phone *</label>
-                                            <input
-                                                value={guestAddress.phone}
-                                                onChange={e => setGuestAddress(prev => ({ ...prev, phone: e.target.value }))}
-                                                placeholder="017XXXXXXXX"
-                                                className="co-input"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="co-label">Email Address (Optional)</label>
+                                    {/* Email Address for Guest Users */}
+                                    {!user && (
+                                        <div className="co-form-field">
+                                            <label className="co-label">Email Address *</label>
                                             <input
                                                 type="email"
                                                 value={guestEmail}
                                                 onChange={e => setGuestEmail(e.target.value)}
                                                 placeholder="you@example.com"
                                                 className="co-input"
+                                                required
                                             />
                                         </div>
+                                    )}
+
+                                    {/* Form Fields */}
+                                    <div className="co-form-field">
+                                        <label className="co-label">Full Name *</label>
+                                        <input value={addrForm.full_name} onChange={e => setAddrForm(p => ({ ...p, full_name: e.target.value }))} className="co-input" placeholder="Your full name" required />
+                                    </div>
+                                    <div className="co-form-field">
+                                        <label className="co-label">Phone Number *</label>
+                                        <input value={addrForm.phone} onChange={e => setAddrForm(p => ({ ...p, phone: e.target.value }))} className="co-input" placeholder="017XXXXXXXX" required />
                                     </div>
                                     <div className="co-form-grid">
                                         <div>
                                             <label className="co-label">District *</label>
-                                            <input
-                                                value={guestAddress.state}
-                                                onChange={e => setGuestAddress(prev => ({ ...prev, state: e.target.value }))}
-                                                placeholder="Dhaka"
-                                                className="co-input"
-                                                required
-                                            />
+                                            <input value={addrForm.state || ''} onChange={e => setAddrForm(p => ({ ...p, state: e.target.value }))} className="co-input" placeholder="District" required />
                                         </div>
-                                        <div>
-                                            <label className="co-label">City / Upazila / Town *</label>
-                                            <input
-                                                value={guestAddress.city}
-                                                onChange={e => setGuestAddress(prev => ({ ...prev, city: e.target.value }))}
-                                                placeholder="Dhaka"
-                                                className="co-input"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="co-form-field">
-                                        <label className="co-label">Detailed Address (Village, Town, Street, House) *</label>
-                                        <input
-                                            value={guestAddress.address_line_1}
-                                            onChange={e => setGuestAddress(prev => ({ ...prev, address_line_1: e.target.value }))}
-                                            placeholder="e.g. Village: X, Post: Y, House: Z"
-                                            className="co-input"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                            ) : addresses.length === 0 && !showAddrForm ? (
-                                <div className="co-empty-addr">
-                                    <MapPin size={32} color="#ccc" />
-                                    <p>No saved addresses</p>
-                                    <button onClick={openAddrCreate} className="co-accent-btn">
-                                        <Plus size={14} /> Add Address
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="co-addr-list">
-                                        {addresses.map(addr => (
-                                            <div
-                                                key={addr.id}
-                                                className={`co-addr-card${selectedAddr === addr.id ? ' co-addr-card--selected' : ''}${blinkAddresses ? ' co-addr-card--blink' : ''}`}
-                                                onClick={() => setSelectedAddr(selectedAddr === addr.id ? null : addr.id)}
-                                            >
-                                                <div className={`co-radio${selectedAddr === addr.id ? ' co-radio--on' : ''}`} />
-                                                <div className="co-addr-body">
-                                                    <div className="co-addr-top">
-                                                        {addr.label === 'Office'
-                                                            ? <Briefcase size={13} color="#4285f4" />
-                                                            : <Home size={13} color="#f5c518" />}
-                                                        <span className="co-addr-label">{addr.label}</span>
-                                                        {addr.is_default && <span className="co-default-badge">Default</span>}
-                                                    </div>
-                                                    <div className="co-addr-name">{addr.full_name}</div>
-                                                    <div className="co-addr-text">
-                                                        {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}, {addr.city}, {addr.state} {addr.postal_code}
-                                                    </div>
-                                                    <div className="co-addr-phone">{addr.phone}</div>
-                                                </div>
-                                                <div className="co-addr-actions" onClick={e => e.stopPropagation()}>
-                                                    <button onClick={() => openAddrEdit(addr)} className="co-icon-btn" title="Edit">
-                                                        <Edit3 size={13} color="#888" />
-                                                    </button>
-                                                    <button onClick={() => setDeleteConfirmId(addr.id)} className="co-icon-btn" title="Delete">
-                                                        <Trash2 size={13} color="#ef4444" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {!showAddrForm && (
-                                        <button onClick={openAddrCreate} className="co-accent-btn co-add-btn">
-                                            <Plus size={13} /> Add New Address
-                                        </button>
-                                    )}
-                                </>
-                            )}
-
-                            {/* Address Form */}
-                            {showAddrForm && (
-                                <div className="co-form-wrap">
-                                    <div className="co-form-header">
-                                        <h3>{editingAddrId ? 'Edit Address' : 'New Address'}</h3>
-                                        <button onClick={() => { setShowAddrForm(false); setEditingAddrId(null); setAddrForm(emptyAddress); }} className="co-close-btn">
-                                            <X size={16} color="#999" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        disabled={detectingLocation}
-                                        onClick={() => handleDetectLocation('form')}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                            width: '100%', padding: '10px', background: '#fafafa', border: '1.5px solid #e0e0e0',
-                                            borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#1a1a1a',
-                                            cursor: detectingLocation ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
-                                            fontFamily: "'Inter', sans-serif", marginBottom: '14px'
-                                        }}
-                                        onMouseEnter={e => { if (!detectingLocation) { e.currentTarget.style.background = '#f0f0f0'; e.currentTarget.style.borderColor = '#ccc'; } }}
-                                        onMouseLeave={e => { if (!detectingLocation) { e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.borderColor = '#e0e0e0'; } }}
-                                    >
-                                        {detectingLocation ? (
-                                            <>
-                                                <Loader2 size={14} className="co-spinner" />
-                                                Detecting Exact Address...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <MapPin size={14} color="#d4a300" />
-                                                Auto Detect My Location
-                                            </>
-                                        )}
-                                    </button>
-                                    <div className="co-form-grid">
-                                        <div>
-                                            <label className="co-label">Label</label>
-                                            <select value={addrForm.label} onChange={e => setAddrForm(p => ({ ...p, label: e.target.value }))} className="co-input">
-                                                {['Home', 'Office', 'Other'].map(l => <option key={l}>{l}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="co-label">Full Name *</label>
-                                            <input value={addrForm.full_name} onChange={e => setAddrForm(p => ({ ...p, full_name: e.target.value }))} className="co-input" />
-                                        </div>
-                                    </div>
-                                    <div className="co-form-field">
-                                        <label className="co-label">Phone *</label>
-                                        <input value={addrForm.phone} onChange={e => setAddrForm(p => ({ ...p, phone: e.target.value }))} className="co-input" />
-                                    </div>
-                                    <div className="co-form-field">
-                                        <label className="co-label">Address Line 1 *</label>
-                                        <input value={addrForm.address_line_1} onChange={e => setAddrForm(p => ({ ...p, address_line_1: e.target.value }))} className="co-input" />
-                                    </div>
-                                    <div className="co-form-grid">
                                         <div>
                                             <label className="co-label">City *</label>
-                                            <input value={addrForm.city} onChange={e => setAddrForm(p => ({ ...p, city: e.target.value }))} className="co-input" />
-                                        </div>
-                                        <div>
-                                            <label className="co-label">State *</label>
-                                            <input value={addrForm.state} onChange={e => setAddrForm(p => ({ ...p, state: e.target.value }))} className="co-input" />
+                                            <input value={addrForm.city} onChange={e => setAddrForm(p => ({ ...p, city: e.target.value }))} className="co-input" placeholder="City" required />
                                         </div>
                                     </div>
-                                    <div className="co-form-grid">
-                                        <div>
-                                            <label className="co-label">Postal Code *</label>
-                                            <input value={addrForm.postal_code} onChange={e => setAddrForm(p => ({ ...p, postal_code: e.target.value }))} className="co-input" />
-                                        </div>
-                                        <div>
-                                            <label className="co-label">Country</label>
-                                            <input value={addrForm.country} onChange={e => setAddrForm(p => ({ ...p, country: e.target.value }))} className="co-input" />
-                                        </div>
+                                    <div className="co-form-field">
+                                        <label className="co-label">Full Address *</label>
+                                        <input value={addrForm.address_line_1} onChange={e => setAddrForm(p => ({ ...p, address_line_1: e.target.value }))} className="co-input" placeholder="e.g. Village: X, Post: Y, House: Z" required />
                                     </div>
-                                    {error && <div className="co-error">{error}</div>}
-                                    <button onClick={handleAddrSave} disabled={addrSaving} className="co-save-btn">
-                                        {addrSaving ? <Loader2 size={14} className="co-spinner" /> : editingAddrId ? <Save size={14} /> : <Check size={14} />}
-                                        {editingAddrId ? 'Update Address' : 'Save & Use'}
-                                    </button>
+
+                                    {/* Save & Use Button for Logged-in Users */}
+                                    {user && (
+                                        <button
+                                            onClick={handleAddrSave}
+                                            disabled={addrSaving}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                                padding: '10px 18px', background: '#1a1a1a', color: '#f5c518',
+                                                border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700,
+                                                cursor: addrSaving ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif",
+                                                marginTop: '4px', width: 'fit-content'
+                                            }}
+                                        >
+                                            {addrSaving ? (
+                                                <Loader2 size={14} className="co-spinner" />
+                                            ) : (
+                                                <Check size={14} />
+                                            )}
+                                            Save & Use
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </motion.div>
 
                     {/* Interactive Order Items */}
-                    {items.map((item) => {
+                    <div className="co-checkout-items">
+                        {items.map((item) => {
                         const key = item.size ? `${item.id}-${item.size}` : item.id;
                         const discount = item.originalPrice ? Math.ceil(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0;
                         return (
@@ -749,7 +663,7 @@ export default function CheckoutPage() {
                                                     </span>
                                                 </div>
                                             )}
-                                            
+
                                             {/* Price Row */}
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                                                 <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
@@ -769,7 +683,7 @@ export default function CheckoutPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        
+
                                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                             <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
                                                 ৳{(item.price * item.quantity).toLocaleString()}
@@ -781,7 +695,7 @@ export default function CheckoutPage() {
                                             )}
                                         </div>
                                     </div>
-                                    
+
                                     {/* Action Row: Quantity Selector + Remove Button */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden', height: '32px', background: '#fff' }}>
@@ -805,7 +719,7 @@ export default function CheckoutPage() {
                                                 +
                                             </button>
                                         </div>
-                                        
+
                                         <button
                                             type="button"
                                             onClick={() => removeFromCart(item.id, item.size)}
@@ -820,6 +734,7 @@ export default function CheckoutPage() {
                             </motion.div>
                         );
                     })}
+                    </div>
                 </div>
 
                 {/* ── Right Column: Summary ── */}
@@ -1023,11 +938,11 @@ export default function CheckoutPage() {
                             <span className="co-total-val">৳{grandTotal.toLocaleString()}</span>
                         </div>
 
-                        {shipping === 0 && (
+                        {/* {shipping === 0 && (
                             <div className="co-free-ship">
                                 <Truck size={13} /> Free shipping on orders ৳{freeShippingThreshold}+
                             </div>
-                        )}
+                        )} */}
 
                         {/* Payment Method */}
                         <div className="co-pay-section">
@@ -1052,27 +967,27 @@ export default function CheckoutPage() {
 
                         {/* Terms & Conditions Checkbox — only for guest users */}
                         {!user && (
-                        <div style={{ marginBottom: '14px', marginTop: '10px' }}>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#555', userSelect: 'none' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={agreedToTerms}
-                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                    style={{ marginTop: '2px', cursor: 'pointer' }}
-                                />
-                                <span>
-                                    I agree to the{' '}
-                                    <Link href="/terms" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
-                                        Terms of Service
-                                    </Link>{' '}
-                                    and{' '}
-                                    <Link href="/privacy" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
-                                        Privacy Policy
-                                    </Link>
-                                    .
-                                </span>
-                            </label>
-                        </div>
+                            <div style={{ marginBottom: '14px', marginTop: '10px' }}>
+                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#555', userSelect: 'none' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={agreedToTerms}
+                                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                        style={{ marginTop: '2px', cursor: 'pointer' }}
+                                    />
+                                    <span>
+                                        I agree to the{' '}
+                                        <Link href="/terms" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
+                                            Terms of Service
+                                        </Link>{' '}
+                                        and{' '}
+                                        <Link href="/privacy" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
+                                            Privacy Policy
+                                        </Link>
+                                        .
+                                    </span>
+                                </label>
+                            </div>
                         )}
 
                         {error && (
@@ -1162,8 +1077,8 @@ export default function CheckoutPage() {
 
                 /* ────── Header ────── */
                 .co-header {
-                    background: linear-gradient(135deg,#1a1a1a 0%,#2e2e2e 100%);
-                    padding: 24px 0;
+                    padding: 4px 0;
+                    background: #f4f4f0;
                 }
                 .co-header-inner {
                     max-width: 1140px;
@@ -1172,15 +1087,16 @@ export default function CheckoutPage() {
                 }
                 .co-back-link {
                     display: inline-flex; align-items: center; gap: 6px;
-                    color: #888; font-size: 12px; text-decoration: none;
+                    color: #000000ff; font-size: 14px; font-weight: 600; text-decoration: none;
                     margin-bottom: 10px;
+                    margin-top:20px;
                 }
-                .co-back-link:hover { color: #ccc; }
+                .co-back-link:hover { color: #000000ff; }
                 .co-title {
                     font-family: 'Outfit', sans-serif;
-                    font-size: 26px; font-weight: 800; color: #fff; margin: 0;
+                    font-size: 26px; font-weight: 800; color: #0000; margin: 0;
                 }
-                .co-subtitle { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 3px; }
+                .co-subtitle { font-size: 12px; color: rgba(0, 0, 0, 0.45); margin-top: 3px; }
 
                 /* ────── Layout ────── */
                 .co-layout {
@@ -1486,6 +1402,8 @@ export default function CheckoutPage() {
                     .co-form-grid { grid-template-columns: 1fr; }
                     .co-total-val { font-size: 20px; }
                     .co-trust { gap: 16px; }
+                    .co-checkout-items { display: none !important; }
+                    .co-hide-mobile { display: none !important; }
                 }
 
                 /* ────── Small Mobile (≤480px) ────── */

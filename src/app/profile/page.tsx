@@ -159,7 +159,7 @@ export default function ProfilePage() {
 
     const handleAddrSave = async () => {
         if (!user) return;
-        if (!addrForm.full_name.trim() || !addrForm.phone.trim() || !addrForm.address_line_1.trim() || !addrForm.city.trim() || !addrForm.state.trim() || !addrForm.postal_code.trim()) {
+        if (!addrForm.full_name.trim() || !addrForm.phone.trim() || !addrForm.address_line_1.trim() || !addrForm.city.trim()) {
             setAddrError('Please fill in all required fields');
             return;
         }
@@ -1066,16 +1066,16 @@ export default function ProfilePage() {
                                 <input value={addrForm.city} onChange={e => setAddrForm(prev => ({ ...prev, city: e.target.value }))} placeholder="City" style={formInput} />
                             </div>
                             <div>
-                                <label style={formLabel}>State *</label>
-                                <input value={addrForm.state} onChange={e => setAddrForm(prev => ({ ...prev, state: e.target.value }))} placeholder="State" style={formInput} />
+                                <label style={formLabel}>State</label>
+                                <input value={addrForm.state || ''} onChange={e => setAddrForm(prev => ({ ...prev, state: e.target.value }))} placeholder="State" style={formInput} />
                             </div>
                         </div>
 
                         {/* Postal, Country */}
                         <div className="profile-addr-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
                             <div>
-                                <label style={formLabel}>Postal Code *</label>
-                                <input value={addrForm.postal_code} onChange={e => setAddrForm(prev => ({ ...prev, postal_code: e.target.value }))} placeholder="110001" style={formInput} />
+                                <label style={formLabel}>Postal Code</label>
+                                <input value={addrForm.postal_code || ''} onChange={e => setAddrForm(prev => ({ ...prev, postal_code: e.target.value }))} placeholder="110001" style={formInput} />
                             </div>
                             <div>
                                 <label style={formLabel}>Country</label>
