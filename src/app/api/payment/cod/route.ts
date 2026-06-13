@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import connectToDatabase from '@/lib/mongodb';
 import Order from '@/lib/models/Order';
+import CartItem from '@/lib/models/CartItem';
 import { updateStockForOrder } from '@/lib/db/queries';
 
 function generateOrderNumber() {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
         // Create COD order in DB
         const order = await Order.create({
-            userId: isGuest ? null : new mongoose.Types.ObjectId(userId),
+            userId: isGuest ? null : userId,
             orderNumber: orderNumber,
             shippingName: address.full_name,
             shippingPhone: address.phone,
@@ -66,6 +67,11 @@ export async function POST(req: NextRequest) {
 
         // Update stock quantities
         await updateStockForOrder(orderItems);
+
+        // Clear existing cart items in database
+        if (!isGuest && userId) {
+            await CartItem.deleteMany({ userId });
+        }
 
         return NextResponse.json({
             success: true,

@@ -53,7 +53,7 @@ export interface IStatusHistory {
 export interface IOrder extends Document {
     _id: mongoose.Types.ObjectId;
     orderNumber: string;
-    userId: mongoose.Types.ObjectId | null;
+    userId: string | null;
     status: string;
     paymentStatus: string;
     paymentMethod: string | null;
@@ -105,7 +105,7 @@ export interface IOrder extends Document {
 const OrderSchema = new Schema<IOrder>(
     {
         orderNumber: { type: String, required: true, unique: true },
-        userId: { type: Schema.Types.ObjectId, ref: 'User', required: false, default: null },
+        userId: { type: String, required: false, default: null },
         status: {
             type: String,
             enum: ['pending', 'confirmed', 'processing', 'shipped', 'in_transit', 'delivered', 'cancelled', 'refunded', 'return_requested', 'returned'],

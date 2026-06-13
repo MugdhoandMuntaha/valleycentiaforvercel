@@ -16,7 +16,7 @@ export interface IReviewImage {
 export interface IReview extends Document {
     _id: mongoose.Types.ObjectId;
     productId: mongoose.Types.ObjectId;
-    userId: mongoose.Types.ObjectId;
+    userId: string;
     orderItemId: mongoose.Types.ObjectId | null;
     rating: number;
     title: string | null;
@@ -32,7 +32,7 @@ export interface IReview extends Document {
 const ReviewSchema = new Schema<IReview>(
     {
         productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
-        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        userId: { type: String, required: true },
         orderItemId: { type: Schema.Types.ObjectId, default: null },
         rating: { type: Number, required: true, min: 1, max: 5 },
         title: { type: String, default: null },

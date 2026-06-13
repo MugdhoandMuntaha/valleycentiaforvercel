@@ -1,7 +1,6 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { SessionProvider } from 'next-auth/react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { CartProvider } from '@/lib/CartContext';
@@ -14,26 +13,21 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
     if (isAdmin) {
         return (
-            <SessionProvider>
-                <AuthProvider>
-                    {children}
-                </AuthProvider>
-            </SessionProvider>
+            <AuthProvider>
+                {children}
+            </AuthProvider>
         );
     }
 
     return (
-        <SessionProvider>
-            <AuthProvider>
-                <CartProvider>
-                    <WishlistProvider>
-                        <Header />
-                        <main style={{ minHeight: '100vh' }}>{children}</main>
-                        <Footer />
-                    </WishlistProvider>
-                </CartProvider>
-            </AuthProvider>
-        </SessionProvider>
+        <AuthProvider>
+            <CartProvider>
+                <WishlistProvider>
+                    <Header />
+                    <main style={{ minHeight: '100vh' }}>{children}</main>
+                    <Footer />
+                </WishlistProvider>
+            </CartProvider>
+        </AuthProvider>
     );
 }
-

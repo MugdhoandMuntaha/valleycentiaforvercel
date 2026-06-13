@@ -687,14 +687,14 @@ export async function getAdminSiteSettings(): Promise<SiteSettingRow[]> {
                     ],
                     support: [
                         { name: 'Help Center', href: '/help' },
-                        { name: 'Delivery Policy', href: '/shipping' },
-                        { name: 'Return & Refund Policy', href: '/returns' },
-                        { name: 'Order Tracking', href: '/tracking' }
+                        { name: 'Contact Us', href: '/about' }
                     ],
                     legal: [
                         { name: 'Privacy Policy', href: '/privacy' },
                         { name: 'Terms & Conditions', href: '/terms' },
-                        { name: 'Cookie Policy', href: '/cookies' }
+                        { name: 'Cookie Policy', href: '/cookies' },
+                        { name: 'Delivery Policy', href: '/shipping' },
+                        { name: 'Return & Refund Policy', href: '/returns' }
                     ]
                 }, null, 4)
             },
@@ -794,13 +794,29 @@ export async function deleteCoupon(id: string): Promise<{ error: string | null }
 export async function getAdminVisibleChanges(): Promise<AdminVisibleChange[]> {
     await connectToDatabase();
     const changes = await VisibleChange.find()
-        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images')
+        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images sizes')
         .sort({ sortOrder: 1, createdAt: -1 }).lean();
 
     return changes.map(vc => {
         const product = vc.productId as unknown as Record<string, unknown> | null;
         const images = product ? (product.images as Array<Record<string, unknown>>) || [] : [];
         const primaryImage = images.find(i => i.isPrimary) || images[0];
+        const sizes = product ? (product.sizes as Array<Record<string, any>>) || [] : [];
+        const activeSizes = sizes.filter(s => s && s.isActive !== false);
+        const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
+
+        const basePrice = defaultSize ? (defaultSize.price as number) : (product ? (product.basePrice as number) : null);
+        const discountPercent = product ? ((product.discountPercent as number) || 0) : null;
+
+        let compareAtPrice: number | null = null;
+        if (defaultSize) {
+            const sizePrice = defaultSize.price as number;
+            compareAtPrice = (discountPercent !== null && discountPercent > 0)
+                ? Math.ceil(sizePrice / (1 - discountPercent / 100))
+                : sizePrice;
+        } else if (product) {
+            compareAtPrice = (product.compareAtPrice as number) || null;
+        }
 
         return {
             id: String(vc._id), product_id: vc.productId ? String((product as Record<string, unknown>)?._id || vc.productId) : null,
@@ -811,9 +827,9 @@ export async function getAdminVisibleChanges(): Promise<AdminVisibleChange[]> {
             product_name: product ? (product.name as string) : null,
             product_slug: product ? (product.slug as string) : null,
             product_image: primaryImage ? (primaryImage.url as string) : null,
-            product_price: product ? (product.basePrice as number) : null,
-            product_original_price: product ? (product.compareAtPrice as number) : null,
-            product_discount_percent: product ? (product.discountPercent as number) : null,
+            product_price: basePrice,
+            product_original_price: compareAtPrice,
+            product_discount_percent: discountPercent,
             product_rating: product ? (product.ratingAvg as number) : null,
             product_review_count: product ? (product.reviewCount as number) : null,
         };

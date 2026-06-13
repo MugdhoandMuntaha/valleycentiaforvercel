@@ -249,15 +249,25 @@ function toProductCard(p: Record<string, unknown>, brand?: Record<string, unknow
     const images = (p.images as Array<Record<string, unknown>>) || [];
     const primaryImage = images.find(i => i.isPrimary) || images[0];
 
+    const sizes = (p.sizes as Array<Record<string, any>>) || [];
+    const activeSizes = sizes.filter(s => s && s.isActive !== false);
+    const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
+
+    const basePrice = defaultSize ? (defaultSize.price as number) : (p.basePrice as number);
+    const discountPercent = (p.discountPercent as number) || 0;
+    const compareAtPrice = defaultSize
+        ? (discountPercent > 0 ? Math.ceil(basePrice / (1 - discountPercent / 100)) : basePrice)
+        : ((p.compareAtPrice as number) || null);
+
     return {
         id: String(p._id),
         slug: p.slug as string,
         name: p.name as string,
         subtitle: (p.subtitle as string) || null,
         short_description: (p.shortDescription as string) || null,
-        base_price: p.basePrice as number,
-        compare_at_price: (p.compareAtPrice as number) || null,
-        discount_percent: (p.discountPercent as number) || 0,
+        base_price: basePrice,
+        compare_at_price: compareAtPrice,
+        discount_percent: discountPercent,
         rating_avg: (p.ratingAvg as number) || 0,
         review_count: (p.reviewCount as number) || 0,
         in_stock: p.inStock as boolean,
@@ -741,6 +751,18 @@ export async function submitReview(data: {
             isApproved: true,
             images: data.images || [],
         });
+
+        // Recalculate average rating and review count
+        const approvedReviews = await Review.find({ productId: data.product_id, isApproved: true }).lean();
+        const reviewCount = approvedReviews.length;
+        const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+        const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;
+
+        await Product.findByIdAndUpdate(data.product_id, {
+            reviewCount,
+            ratingAvg,
+        });
+
         return { error: null };
     } catch (err) {
         console.error('Error submitting review:', err);
@@ -944,7 +966,7 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
     await connectToDatabase();
 
     const changes = await VisibleChange.find({ isActive: true })
-        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images')
+        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images sizes')
         .sort('sortOrder')
         .lean();
 
@@ -955,6 +977,16 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
             const images = (product.images as Array<Record<string, unknown>>) || [];
             const primaryImage = images.find(i => i.isPrimary) || images[0];
             const reviewCount = Number(product.reviewCount) || 0;
+
+            const sizes = (product.sizes as Array<Record<string, any>>) || [];
+            const activeSizes = sizes.filter(s => s && s.isActive !== false);
+            const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
+
+            const basePrice = defaultSize ? (defaultSize.price as number) : (product.basePrice as number);
+            const discountPercent = (product.discountPercent as number) || 0;
+            const compareAtPrice = defaultSize
+                ? (discountPercent > 0 ? Math.ceil(basePrice / (1 - discountPercent / 100)) : basePrice)
+                : ((product.compareAtPrice as number) || null);
 
             return {
                 id: String(vc._id),
@@ -967,9 +999,9 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
                 productName: (product.name as string) || 'Product',
                 rating: Number(product.ratingAvg) || 0,
                 reviewCount: reviewCount >= 1000 ? `${(reviewCount / 1000).toFixed(1)}K` : String(reviewCount),
-                price: Math.ceil(Number(product.basePrice) || 0),
-                originalPrice: Math.ceil(Number(product.compareAtPrice) || 0),
-                discountPercent: Number(product.discountPercent) || 0,
+                price: Math.ceil(basePrice || 0),
+                originalPrice: Math.ceil(compareAtPrice || 0),
+                discountPercent: Number(discountPercent) || 0,
             };
         });
 }

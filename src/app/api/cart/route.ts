@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@clerk/nextjs/server';
 import connectToDatabase from '@/lib/mongodb';
 import CartItem from '@/lib/models/CartItem';
 import Product from '@/lib/models/Product';
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
-        const userId = (session.user as Record<string, unknown>).id as string;
         await connectToDatabase();
 
         const dbItems = await CartItem.find({ userId })
@@ -26,12 +24,14 @@ export async function GET() {
             let price = prod.basePrice;
             let originalPrice = prod.compareAtPrice || undefined;
             let sizeLabel = undefined;
+            let stockQuantity = prod.stockQuantity || 0;
 
             if (item.sizeId && prod.sizes) {
                 const sz = prod.sizes.find((s: any) => String(s._id) === String(item.sizeId));
                 if (sz) {
                     price = sz.price;
                     sizeLabel = sz.label;
+                    stockQuantity = sz.stockQuantity || 0;
                 }
             }
 
@@ -50,6 +50,7 @@ export async function GET() {
                 originalPrice: originalPrice ? Math.ceil(originalPrice) : undefined,
                 size: sizeLabel,
                 quantity: item.quantity,
+                stockQuantity: stockQuantity,
             };
         }).filter(Boolean);
 
@@ -62,12 +63,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
-        const userId = (session.user as Record<string, unknown>).id as string;
+
         const body = await req.json();
         const clientItems = body.items || [];
 

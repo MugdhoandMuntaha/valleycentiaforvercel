@@ -11,17 +11,17 @@ import {
 import type { AdminSection, SectionFormData } from '@/lib/db/adminQueries';
 
 const SECTION_TYPES = [
-    { value: 'BEST SELLERS', label: 'Best Sellers' },
-    { value: 'NEW LAUNCHES', label: 'New Launches' },
-    { value: 'POWER CARE DUOS', label: 'Power Care Duos' },
-    { value: 'HERO CAROUSEL', label: 'Hero Carousel' },
-    { value: 'BRANDS THAT LEAD', label: 'Brands That Lead' },
-    { value: 'VISIBLE CHANGE', label: 'Visible Change' },
-    { value: 'CUSTOM', label: 'Custom' },
+    { value: 'best_sellers', label: 'Best Sellers' },
+    { value: 'new_launches', label: 'New Launches' },
+    { value: 'power_care_duos', label: 'Power Care Duos' },
+    { value: 'hero_carousel', label: 'Hero Carousel' },
+    { value: 'brands_that_lead', label: 'Brands That Lead' },
+    { value: 'visible_change', label: 'Visible Change' },
+    { value: 'custom', label: 'Custom' },
 ];
 
 const emptyForm: SectionFormData = {
-    section_type: 'BEST SELLERS', title: '', subtitle: '', badge_text: '',
+    section_type: 'best_sellers', title: '', subtitle: '', badge_text: '',
     cta_text: '', cta_link: '', background_color: '', is_active: true, sort_order: 0,
 };
 

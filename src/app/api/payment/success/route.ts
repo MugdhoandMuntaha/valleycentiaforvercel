@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import Order from '@/lib/models/Order';
+import CartItem from '@/lib/models/CartItem';
 import { updateStockForOrder } from '@/lib/db/queries';
 
 export async function POST(req: NextRequest) {
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
             if (order) {
                 // Order is confirmed for the first time -> update stock
                 await updateStockForOrder(order.orderItems);
+                if (order.userId) {
+                    await CartItem.deleteMany({ userId: order.userId });
+                }
             } else {
                 // Already confirmed (e.g. via IPN/success overlap) -> fetch it
                 order = await Order.findOne({ transactionId: tran_id });

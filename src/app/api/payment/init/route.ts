@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
         // 1. Create order in DB
         const order = await Order.create({
-            userId: isGuest ? null : new mongoose.Types.ObjectId(userId),
+            userId: isGuest ? null : userId,
             orderNumber: orderNumber,
             shippingName: address.full_name,
             shippingPhone: address.phone,

@@ -232,7 +232,7 @@ export default function CheckoutPage() {
     };
 
     const handlePay = async () => {
-        if (!agreedToTerms) {
+        if (!user && !agreedToTerms) {
             setError('You must agree to the Terms of Service and Privacy Policy to place your order.');
             return;
         }
@@ -701,7 +701,8 @@ export default function CheckoutPage() {
                             </label>
                         </div>
 
-                        {/* Terms & Conditions Checkbox */}
+                        {/* Terms & Conditions Checkbox — only for guest users */}
+                        {!user && (
                         <div style={{ marginBottom: '14px', marginTop: '10px' }}>
                             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#555', userSelect: 'none' }}>
                                 <input
@@ -723,6 +724,7 @@ export default function CheckoutPage() {
                                 </span>
                             </label>
                         </div>
+                        )}
 
                         {error && (
                             <motion.div

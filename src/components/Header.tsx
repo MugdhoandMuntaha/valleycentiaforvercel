@@ -94,7 +94,7 @@ export default function Header() {
         announcement_text: 'Free shipping on orders above ৳499',
     });
 
-    // Fetch products and nav links from Supabase
+
     useEffect(() => {
         getProductCards().then(cards => {
             setAllProducts(cards.map(p => ({
@@ -882,7 +882,7 @@ export default function Header() {
                                     style={{
                                         background: 'none',
                                         border: 'none',
-                                        color: '#aaa',
+                                        color: '#ffffff',
                                         cursor: 'pointer',
                                         padding: '8px',
                                         borderRadius: '6px',
@@ -892,11 +892,11 @@ export default function Header() {
                                         transition: 'all 0.15s ease',
                                     }}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.color = '#fff';
+                                        e.currentTarget.style.color = '#ccc';
                                         e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.color = '#aaa';
+                                        e.currentTarget.style.color = '#ffffff';
                                         e.currentTarget.style.background = 'none';
                                     }}
                                     aria-label="Profile Menu"
@@ -1013,7 +1013,7 @@ export default function Header() {
                                 style={{
                                     background: 'none',
                                     border: 'none',
-                                    color: '#aaa',
+                                    color: '#ffffff',
                                     cursor: 'pointer',
                                     padding: '8px',
                                     borderRadius: '6px',
@@ -1025,11 +1025,11 @@ export default function Header() {
                                     position: 'relative',
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.color = '#fff';
+                                    e.currentTarget.style.color = '#ccc';
                                     e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.color = '#aaa';
+                                    e.currentTarget.style.color = '#ffffff';
                                     e.currentTarget.style.background = 'none';
                                 }}
                                 aria-label="Profile"
@@ -1043,7 +1043,7 @@ export default function Header() {
                             style={{
                                 background: 'none',
                                 border: 'none',
-                                color: '#aaa',
+                                color: '#ffffff',
                                 cursor: 'pointer',
                                 padding: '8px',
                                 borderRadius: '6px',
@@ -1055,11 +1055,11 @@ export default function Header() {
                                 textDecoration: 'none',
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.color = '#fff';
+                                e.currentTarget.style.color = '#ccc';
                                 e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.color = '#aaa';
+                                e.currentTarget.style.color = '#ffffff';
                                 e.currentTarget.style.background = 'none';
                             }}
                             aria-label="Cart"
@@ -1328,7 +1328,7 @@ export default function Header() {
                                         gap: '4px',
                                         fontSize: '13px',
                                         fontWeight: 500,
-                                        color: '#ccc',
+                                        color: '#ffffffff',
                                         padding: '10px 16px',
                                         transition: 'color 0.15s ease, background 0.15s ease',
                                         whiteSpace: 'nowrap',
@@ -1336,11 +1336,11 @@ export default function Header() {
                                         textDecoration: 'none',
                                     }}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.color = '#ffffff';
+                                        e.currentTarget.style.color = '#ccc';
                                         e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.color = '#ccc';
+                                        e.currentTarget.style.color = '#ffffff';
                                         e.currentTarget.style.background = 'none';
                                     }}
                                 >
@@ -1389,18 +1389,18 @@ export default function Header() {
                                                         padding: '10px 18px',
                                                         fontSize: '13px',
                                                         fontWeight: 400,
-                                                        color: '#ccc',
+                                                        color: '#ffffffff',
                                                         textDecoration: 'none',
                                                         transition: 'all 0.12s ease',
                                                         fontFamily: "'Inter', sans-serif",
                                                     }}
                                                     onMouseEnter={(e) => {
-                                                        e.currentTarget.style.color = '#ffffff';
+                                                        e.currentTarget.style.color = '#ccc';
                                                         e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                                                         e.currentTarget.style.paddingLeft = '22px';
                                                     }}
                                                     onMouseLeave={(e) => {
-                                                        e.currentTarget.style.color = '#ccc';
+                                                        e.currentTarget.style.color = '#ffffff';
                                                         e.currentTarget.style.background = 'none';
                                                         e.currentTarget.style.paddingLeft = '18px';
                                                     }}

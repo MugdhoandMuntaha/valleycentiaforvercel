@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingBag, ChevronLeft, ChevronRight, Star } from 'lucide-react';
@@ -31,7 +31,7 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
     const { addToCart } = useCart();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(true);
+    const [canScrollRight, setCanScrollRight] = useState(false);
 
     const checkScroll = () => {
         if (!scrollRef.current) return;
@@ -39,6 +39,18 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
         setCanScrollLeft(scrollLeft > 5);
         setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
     };
+
+    useEffect(() => {
+        checkScroll();
+        // A small timeout ensures NextJS styles are fully resolved and DOM dimensions are accurate
+        const timer = setTimeout(checkScroll, 150);
+
+        window.addEventListener('resize', checkScroll);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', checkScroll);
+        };
+    }, [transformations]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (!scrollRef.current) return;
@@ -192,8 +204,8 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                                 href={`/product/${item.slug}`}
                                 className="vc-card"
                                 style={{
-                                    minWidth: 'calc((100% - 60px) / 4)',
-                                    maxWidth: 'calc((100% - 60px) / 4)',
+                                    minWidth: 'calc((100% - 80px) / 4.17)',
+                                    maxWidth: 'calc((100% - 80px) / 4.17)',
                                     background: '#ffffff',
                                     borderRadius: '14px',
                                     overflow: 'hidden',

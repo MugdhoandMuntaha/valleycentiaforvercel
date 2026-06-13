@@ -29,6 +29,8 @@ function toSectionProduct(p: SectionProductCard): SectionProduct {
     badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
     extraBadge: (p.custom_badge_text as string) || undefined,
     inStock: p.in_stock !== undefined ? p.in_stock : true,
+    stockQuantity: p.stock_quantity !== undefined ? p.stock_quantity : 0,
+    sizes: p.sizes || null,
   };
 }
 
@@ -63,17 +65,6 @@ export default async function HomePage() {
     link: s.cta_link || undefined,
   }));
 
-  // Filter to only product sections (sorted by sort_order from DB)
-  const productSections = sections.filter(
-    (s) => !NON_PRODUCT_SECTION_TYPES.includes(s.section_type)
-  );
-
-  // Split into core sections (above Brands) and custom sections (below Brands)
-  const CORE_TYPES = ['best_sellers', 'new_launches'];
-  const coreSections = productSections.filter((s) => CORE_TYPES.includes(s.section_type));
-  const powerDuos = productSections.find((s) => s.section_type === 'power_care_duos');
-  const customSections = productSections.filter((s) => !CORE_TYPES.includes(s.section_type) && s.section_type !== 'power_care_duos');
-
   // Map brands for BrandsThatLead
   const brandCards = brands.map((b, i) => {
     const accent = b.accent_color || '#c4a882';
@@ -88,51 +79,58 @@ export default async function HomePage() {
     };
   });
 
+  // Filter active sections that are either non-product sections OR product sections with actual products
+  const activeSections = sections.filter(s =>
+    NON_PRODUCT_SECTION_TYPES.includes(s.section_type) || (s.products && s.products.length > 0)
+  );
+
   return (
     <>
       {/* ===== HERO CAROUSEL ===== */}
       <HeroCarousel slides={heroSlides} />
 
-      {/* ===== CORE PRODUCT SECTIONS (above brands) ===== */}
-      {coreSections.map((section, index) => (
-        <ProductCarouselSection
-          key={section.id}
-          title={section.title}
-          subtitle={section.subtitle || ''}
-          products={section.products.map(toSectionProduct)}
-          background={DEFAULT_BACKGROUNDS[index % DEFAULT_BACKGROUNDS.length]}
-          viewAllHref={section.cta_link || `/shop?section=${section.section_type}`}
-        />
-      ))}
+      {/* ===== DYNAMIC SECTIONS ORDERED BY DB SORT_ORDER ===== */}
+      {activeSections.map((section, index) => {
+        if (section.section_type === 'hero_carousel') {
+          return null;
+        }
 
-      {/* ===== BRANDS THAT LEAD ===== */}
-      <BrandsThatLead brands={brandCards} background="#f9f9f6" />
+        if (section.section_type === 'brands_that_lead') {
+          return (
+            <BrandsThatLead
+              key={section.id}
+              brands={brandCards}
+              background={section.background_color || '#f9f9f6'}
+            />
+          );
+        }
 
-      {/* ===== POWER CARE DUOS (hardcoded below brands) ===== */}
-      {powerDuos && (
-        <ProductCarouselSection
-          title={powerDuos.title}
-          subtitle={powerDuos.subtitle || ''}
-          products={powerDuos.products.map(toSectionProduct)}
-          background="#ffffff"
-          viewAllHref={powerDuos.cta_link || '/shop?section=power-care-duos'}
-        />
+        if (section.section_type === 'visible_change') {
+          return (
+            <VisibleChange
+              key={section.id}
+              items={visibleChanges}
+            />
+          );
+        }
+
+        // Default to ProductCarouselSection for other types (best_sellers, new_launches, power_care_duos, custom)
+        return (
+          <ProductCarouselSection
+            key={section.id}
+            title={section.title}
+            subtitle={section.subtitle || ''}
+            products={section.products.map(toSectionProduct)}
+            background={section.background_color || DEFAULT_BACKGROUNDS[index % DEFAULT_BACKGROUNDS.length]}
+            viewAllHref={section.cta_link || `/shop?section=${section.section_type}`}
+          />
+        );
+      })}
+
+      {/* Fallback for Visible Change if not dynamically placed in database */}
+      {!activeSections.some(s => s.section_type === 'visible_change') && (
+        <VisibleChange items={visibleChanges} />
       )}
-
-      {/* ===== CUSTOM SECTIONS (added from admin, below power duos) ===== */}
-      {customSections.map((section, index) => (
-        <ProductCarouselSection
-          key={section.id}
-          title={section.title}
-          subtitle={section.subtitle || ''}
-          products={section.products.map(toSectionProduct)}
-          background={DEFAULT_BACKGROUNDS[index % DEFAULT_BACKGROUNDS.length]}
-          viewAllHref={section.cta_link || `/shop?section=${section.section_type}`}
-        />
-      ))}
-
-      {/* ===== VISIBLE CHANGE / REAL STORIES ===== */}
-      <VisibleChange items={visibleChanges} />
     </>
   );
 }

@@ -880,21 +880,7 @@ function ShopContent() {
                                             )}
                                         </div>
 
-                                        {/* Coupon */}
-                                        {product.couponPrice != null && product.couponCode && (
-                                            <p
-                                                style={{
-                                                    fontFamily: "'Inter', sans-serif",
-                                                    fontSize: '11px',
-                                                    color: '#2e7d32',
-                                                    fontWeight: 600,
-                                                    marginBottom: '12px',
-                                                }}
-                                            >
-                                                ⭐ Get it for ৳{product.couponPrice} with{' '}
-                                                {product.couponCode}
-                                            </p>
-                                        )}
+
 
                                         {/* Add to Cart */}
                                         <button

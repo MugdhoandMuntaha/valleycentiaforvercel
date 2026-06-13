@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { LayoutShell } from "@/components/LayoutShell";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -34,11 +35,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
-      <body>
-        <ScrollToTop />
-        <LayoutShell>{children}</LayoutShell>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+        <body>
+          <ScrollToTop />
+          <LayoutShell>{children}</LayoutShell>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
+

@@ -21,14 +21,14 @@ const DEFAULT_FOOTER_LINKS = {
     ],
     support: [
         { name: 'Help Center', href: '/help' },
-        { name: 'Delivery Policy', href: '/shipping' },
-        { name: 'Return & Refund Policy', href: '/returns' },
-        { name: 'Order Tracking', href: '/tracking' },
+        { name: 'Contact Us', href: '/about' },
     ],
     legal: [
         { name: 'Privacy Policy', href: '/privacy' },
         { name: 'Terms & Conditions', href: '/terms' },
         { name: 'Cookie Policy', href: '/cookies' },
+        { name: 'Delivery Policy', href: '/shipping' },
+        { name: 'Return & Refund Policy', href: '/returns' },
     ],
 };
 

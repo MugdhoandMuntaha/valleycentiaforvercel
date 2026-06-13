@@ -356,6 +356,8 @@ a {
 
   .pdp-main-image {
     width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
   }
 
   .benefits-grid {
@@ -384,11 +386,6 @@ a {
   .pdp-thumbnails::-webkit-scrollbar-thumb {
     background: #ccc;
     border-radius: 4px;
-  }
-
-  .pdp-main-image {
-    width: 100% !important;
-    height: 400px !important;
   }
 
   .pdp-action-buttons {
@@ -427,10 +424,6 @@ a {
 }
 
 @media (max-width: 480px) {
-  .pdp-main-image {
-    height: 320px !important;
-  }
-
   .benefits-grid {
     grid-template-columns: 1fr !important;
   }
@@ -748,8 +741,8 @@ a {
   }
 
   .carousel-card {
-    min-width: calc((100% - 40px) / 3) !important;
-    max-width: calc((100% - 40px) / 3) !important;
+    min-width: calc((100% - 60px) / 3.17) !important;
+    max-width: calc((100% - 60px) / 3.17) !important;
   }
 
   /* Brands grid */
@@ -760,8 +753,8 @@ a {
 
   /* Visible Change cards */
   .vc-card {
-    min-width: calc((100% - 40px) / 3) !important;
-    max-width: calc((100% - 40px) / 3) !important;
+    min-width: calc((100% - 60px) / 3.17) !important;
+    max-width: calc((100% - 60px) / 3.17) !important;
   }
 
   /* Scroll arrows — smaller on tablet */
@@ -807,8 +800,8 @@ a {
   }
 
   .carousel-card {
-    min-width: calc((100% - 12px) / 2) !important;
-    max-width: calc((100% - 12px) / 2) !important;
+    min-width: calc((100% - 24px) / 2.10) !important;
+    max-width: calc((100% - 24px) / 2.10) !important;
     height: auto !important;
   }
 
@@ -867,8 +860,8 @@ a {
 
   /* Visible Change (Before/After) cards */
   .vc-card {
-    min-width: calc((100% - 12px) / 2) !important;
-    max-width: calc((100% - 12px) / 2) !important;
+    min-width: calc((100% - 24px) / 2.10) !important;
+    max-width: calc((100% - 24px) / 2.10) !important;
   }
 
   .vc-card .vc-image-area {
@@ -973,8 +966,8 @@ a {
   }
 
   .carousel-card {
-    min-width: calc((100% - 10px) / 2) !important;
-    max-width: calc((100% - 10px) / 2) !important;
+    min-width: calc((100% - 20px) / 2.10) !important;
+    max-width: calc((100% - 20px) / 2.10) !important;
     height: auto !important;
   }
 
@@ -1007,8 +1000,8 @@ a {
 
   /* VC cards tighter */
   .vc-card {
-    min-width: calc((100% - 10px) / 2) !important;
-    max-width: calc((100% - 10px) / 2) !important;
+    min-width: calc((100% - 20px) / 2.10) !important;
+    max-width: calc((100% - 20px) / 2.10) !important;
   }
 
   .vc-card .vc-image-area {

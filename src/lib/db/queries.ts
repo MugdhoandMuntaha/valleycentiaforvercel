@@ -57,6 +57,8 @@ export interface ProductCard {
     category_slug: string | null;
     primary_image_url: string | null;
     badges: { badge: string; label: string | null; color: string | null }[] | null;
+    stock_quantity?: number;
+    sizes?: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
 }
 
 export interface BrandData {
@@ -114,7 +116,7 @@ export interface ProductDetail {
     category_name: string | null;
     category_slug: string | null;
     images: { url: string; alt: string | null }[] | null;
-    sizes: { id: string; label: string; ml: string | null; price: number; is_default: boolean }[] | null;
+    sizes: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
     key_benefits: { icon: string; title: string; desc: string }[] | null;
     highlights: string[] | null;
     badges: { badge: string; label: string | null; color: string | null }[] | null;
@@ -249,18 +251,29 @@ function toProductCard(p: Record<string, unknown>, brand?: Record<string, unknow
     const images = (p.images as Array<Record<string, unknown>>) || [];
     const primaryImage = images.find(i => i.isPrimary) || images[0];
 
+    const sizes = (p.sizes as Array<Record<string, any>>) || [];
+    const activeSizes = sizes.filter(s => s && s.isActive !== false);
+    const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
+
+    const basePrice = defaultSize ? (defaultSize.price as number) : (p.basePrice as number);
+    const discountPercent = (p.discountPercent as number) || 0;
+    const compareAtPrice = defaultSize
+        ? (discountPercent > 0 ? Math.ceil(basePrice / (1 - discountPercent / 100)) : basePrice)
+        : ((p.compareAtPrice as number) || null);
+
     return {
         id: String(p._id),
         slug: p.slug as string,
         name: p.name as string,
         subtitle: (p.subtitle as string) || null,
         short_description: (p.shortDescription as string) || null,
-        base_price: p.basePrice as number,
-        compare_at_price: (p.compareAtPrice as number) || null,
-        discount_percent: (p.discountPercent as number) || 0,
+        base_price: basePrice,
+        compare_at_price: compareAtPrice,
+        discount_percent: discountPercent,
         rating_avg: (p.ratingAvg as number) || 0,
         review_count: (p.reviewCount as number) || 0,
-        in_stock: p.inStock as boolean,
+        in_stock: (p.inStock as boolean) && (p.stockQuantity !== undefined ? (p.stockQuantity as number) > 0 : true),
+        stock_quantity: (p.stockQuantity as number) || 0,
         is_featured: p.isFeatured as boolean,
         concerns: (p.concerns as string[]) || null,
         tags: (p.tags as string[]) || null,
@@ -272,6 +285,14 @@ function toProductCard(p: Record<string, unknown>, brand?: Record<string, unknow
         badges: badges.length > 0
             ? badges.map(b => ({ badge: b.badge as string, label: (b.customLabel as string) || null, color: (b.badgeColor as string) || null }))
             : null,
+        sizes: activeSizes.length > 0 ? activeSizes.map(s => ({
+            id: String(s._id),
+            label: s.label as string,
+            ml: (s.mlValue as string) || null,
+            price: s.price as number,
+            is_default: s.isDefault as boolean,
+            stockQuantity: s.stockQuantity !== undefined ? (s.stockQuantity as number) : 0,
+        })) : null,
     };
 }
 
@@ -549,7 +570,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         discount_percent: product.discountPercent,
         rating_avg: product.ratingAvg,
         review_count: product.reviewCount,
-        in_stock: product.inStock,
+        in_stock: product.inStock && (product.stockQuantity !== undefined ? product.stockQuantity > 0 : true),
         stock_quantity: product.stockQuantity,
         concerns: product.concerns?.length ? product.concerns : null,
         tags: product.tags?.length ? product.tags : null,
@@ -564,6 +585,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
             ml: s.mlValue || null,
             price: s.price,
             is_default: s.isDefault,
+            stockQuantity: s.stockQuantity !== undefined ? s.stockQuantity : 0,
         })) || null,
         key_benefits: product.keyBenefits?.map(kb => ({
             icon: kb.iconName,
@@ -741,6 +763,18 @@ export async function submitReview(data: {
             isApproved: true,
             images: data.images || [],
         });
+
+        // Recalculate average rating and review count
+        const approvedReviews = await Review.find({ productId: data.product_id, isApproved: true }).lean();
+        const reviewCount = approvedReviews.length;
+        const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+        const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;
+
+        await Product.findByIdAndUpdate(data.product_id, {
+            reviewCount,
+            ratingAvg,
+        });
+
         return { error: null };
     } catch (err) {
         console.error('Error submitting review:', err);
@@ -944,7 +978,7 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
     await connectToDatabase();
 
     const changes = await VisibleChange.find({ isActive: true })
-        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images')
+        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images sizes')
         .sort('sortOrder')
         .lean();
 
@@ -955,6 +989,16 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
             const images = (product.images as Array<Record<string, unknown>>) || [];
             const primaryImage = images.find(i => i.isPrimary) || images[0];
             const reviewCount = Number(product.reviewCount) || 0;
+
+            const sizes = (product.sizes as Array<Record<string, any>>) || [];
+            const activeSizes = sizes.filter(s => s && s.isActive !== false);
+            const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
+
+            const basePrice = defaultSize ? (defaultSize.price as number) : (product.basePrice as number);
+            const discountPercent = (product.discountPercent as number) || 0;
+            const compareAtPrice = defaultSize
+                ? (discountPercent > 0 ? Math.ceil(basePrice / (1 - discountPercent / 100)) : basePrice)
+                : ((product.compareAtPrice as number) || null);
 
             return {
                 id: String(vc._id),
@@ -967,9 +1011,9 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
                 productName: (product.name as string) || 'Product',
                 rating: Number(product.ratingAvg) || 0,
                 reviewCount: reviewCount >= 1000 ? `${(reviewCount / 1000).toFixed(1)}K` : String(reviewCount),
-                price: Math.ceil(Number(product.basePrice) || 0),
-                originalPrice: Math.ceil(Number(product.compareAtPrice) || 0),
-                discountPercent: Number(product.discountPercent) || 0,
+                price: Math.ceil(basePrice || 0),
+                originalPrice: Math.ceil(compareAtPrice || 0),
+                discountPercent: Number(discountPercent) || 0,
             };
         });
 }

@@ -1,6 +1,5 @@
 import { type AuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import GoogleProvider from 'next-auth/providers/google';
 import connectToDatabase from '@/lib/mongodb';
 import User from '@/lib/models/User';
 
@@ -27,6 +26,10 @@ export const authOptions: AuthOptions = {
                     throw new Error('No account found with this email');
                 }
 
+                if (user.role !== 'admin') {
+                    throw new Error('Access denied. Only administrators can access this panel.');
+                }
+
                 if (!user.password) {
                     throw new Error('This account uses Google sign-in. Please use Google to log in.');
                 }
@@ -44,16 +47,6 @@ export const authOptions: AuthOptions = {
                 };
             },
         }),
-
-        // Google OAuth (only if credentials are configured)
-        ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-            ? [
-                GoogleProvider({
-                    clientId: process.env.GOOGLE_CLIENT_ID,
-                    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-                }),
-            ]
-            : []),
     ],
 
     session: {

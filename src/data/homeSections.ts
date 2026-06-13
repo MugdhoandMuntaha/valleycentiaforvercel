@@ -17,6 +17,8 @@ export interface SectionProduct {
     badgeColor?: string;
     extraBadge?: string;
     inStock?: boolean;
+    stockQuantity?: number;
+    sizes?: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
 }
 
 /* ═══════════════════════════════════════════════════════

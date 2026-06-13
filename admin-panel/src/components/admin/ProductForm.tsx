@@ -191,15 +191,20 @@ export default function ProductForm({ productId }: Props) {
         init();
     }, [productId]);
  
-    // Auto-calculate cost price (selling price) when base price or discount percentage changes
+    // Auto-calculate base price (original price/MRP) when cost price or discount percentage changes
     useEffect(() => {
-        const base = form.base_price || 0;
+        const cost = form.cost_price || 0;
         const discount = form.discount_percent || 0;
-        const calculated = Math.round((base * (1 - discount / 100)) * 100) / 100;
-        if (form.cost_price !== calculated) {
-            setForm(f => ({ ...f, cost_price: calculated }));
+        let calculated = cost;
+        if (discount < 100) {
+            calculated = Math.round((cost / (1 - discount / 100)) * 100) / 100;
+        } else {
+            calculated = cost;
         }
-    }, [form.base_price, form.discount_percent, form.cost_price]);
+        if (form.base_price !== calculated) {
+            setForm(f => ({ ...f, base_price: calculated }));
+        }
+    }, [form.cost_price, form.discount_percent, form.base_price]);
 
     // Auto-slug from name
     function handleNameChange(name: string) {
@@ -222,8 +227,8 @@ export default function ProductForm({ productId }: Props) {
             alert('Product slug is required');
             return;
         }
-        if (form.base_price <= 0) {
-            alert('Base price must be greater than 0');
+        if ((form.cost_price || 0) <= 0) {
+            alert('Cost price must be greater than 0');
             return;
         }
 
@@ -656,13 +661,14 @@ export default function ProductForm({ productId }: Props) {
                     <div style={sectionBodyStyle}>
                         <div style={gridTwoCol}>
                             <div>
-                                <label style={labelStyle}>Base Price (৳) *</label>
+                                <label style={labelStyle}>Cost Price (৳) (Selling Price) *</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     style={inputStyle}
-                                    value={form.base_price || ''}
-                                    onChange={e => setForm(f => ({ ...f, base_price: parseFloat(e.target.value) || 0 }))}
+                                    value={form.cost_price ?? ''}
+                                    onChange={e => setForm(f => ({ ...f, cost_price: parseFloat(e.target.value) || 0 }))}
+                                    placeholder="e.g. 80.00"
                                 />
                             </div>
                             <div>
@@ -673,17 +679,18 @@ export default function ProductForm({ productId }: Props) {
                                     style={inputStyle}
                                     value={form.discount_percent || ''}
                                     onChange={e => setForm(f => ({ ...f, discount_percent: parseFloat(e.target.value) || 0 }))}
+                                    placeholder="e.g. 20"
                                 />
                             </div>
                         </div>
                         <div style={gridTwoCol}>
                             <div>
-                                <label style={labelStyle}>Cost Price (৳) (Calculated Selling Price)</label>
+                                <label style={labelStyle}>Base Price (৳) (Calculated Original Price)</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     style={{ ...inputStyle, opacity: 0.7, cursor: 'not-allowed' }}
-                                    value={form.cost_price ?? ''}
+                                    value={form.base_price || ''}
                                     readOnly
                                     placeholder="Auto-calculated"
                                 />

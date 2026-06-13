@@ -23,6 +23,7 @@ export interface CartItem {
     originalPrice?: number;
     size?: string;
     quantity: number;
+    stockQuantity?: number;
 }
 
 interface CartContextType {
@@ -221,14 +222,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const existing = prev.find(
                 (i) => (i.size ? `${i.id}-${i.size}` : i.id) === key
             );
+            const maxStock = item.stockQuantity !== undefined ? item.stockQuantity : 10;
             if (existing) {
                 return prev.map((i) =>
                     (i.size ? `${i.id}-${i.size}` : i.id) === key
-                        ? { ...i, quantity: Math.min(i.quantity + quantity, 10) }
+                        ? { ...i, quantity: Math.min(i.quantity + quantity, maxStock) }
                         : i
                 );
             }
-            return [...prev, { ...roundedItem, quantity }];
+            return [...prev, { ...roundedItem, quantity: Math.min(quantity, maxStock) }];
         });
         // Trigger bounce animation
         setCartBounce(true);
@@ -252,15 +254,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (quantity < 1) return;
         setItems((prev) => {
             const key = size ? `${id}-${size}` : id;
-            return prev.map((i) =>
-                (i.size ? `${i.id}-${i.size}` : i.id) === key
-                    ? { ...i, quantity: Math.min(quantity, 10) }
-                    : i
-            );
+            return prev.map((i) => {
+                if ((i.size ? `${i.id}-${i.size}` : i.id) === key) {
+                    const maxStock = i.stockQuantity !== undefined ? i.stockQuantity : 10;
+                    return { ...i, quantity: Math.min(quantity, maxStock) };
+                }
+                return i;
+            });
         });
     }, []);
 
-    const clearCart = useCallback(() => setItems([]), []);
+    const clearCart = useCallback(() => {
+        setItems([]);
+        if (user) {
+            fetch('/api/cart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: [] }),
+                keepalive: true,
+            }).catch(err => console.error('Error clearing cart in DB:', err));
+        }
+    }, [user]);
 
     const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
     const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);

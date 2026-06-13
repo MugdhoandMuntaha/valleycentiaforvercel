@@ -5,6 +5,7 @@ export type UserRole = 'customer' | 'admin';
 
 export interface IUser extends Document {
     _id: mongoose.Types.ObjectId;
+    clerkId: string | null;
     email: string;
     password?: string; // Optional for OAuth users
     fullName: string | null;
@@ -16,7 +17,7 @@ export interface IUser extends Document {
     role: UserRole;
     isEmailVerified: boolean;
     isPhoneVerified: boolean;
-    provider: 'credentials' | 'google';
+    provider: 'credentials' | 'google' | 'clerk';
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
@@ -24,7 +25,8 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>(
     {
-        email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+        clerkId: { type: String, default: null, unique: true, sparse: true },
+        email: { type: String, required: false, unique: true, sparse: true, lowercase: true, trim: true },
         password: { type: String, select: false }, // Excluded from queries by default
         fullName: { type: String, default: null },
         displayName: { type: String, default: null },
@@ -35,13 +37,14 @@ const UserSchema = new Schema<IUser>(
         role: { type: String, enum: ['customer', 'admin'], default: 'customer', lowercase: true, trim: true },
         isEmailVerified: { type: Boolean, default: false },
         isPhoneVerified: { type: Boolean, default: false },
-        provider: { type: String, enum: ['credentials', 'google'], default: 'credentials' },
+        provider: { type: String, enum: ['credentials', 'google', 'clerk'], default: 'clerk' },
     },
     { timestamps: true }
 );
 
-// Index
+// Indexes
 UserSchema.index({ phone: 1 });
+UserSchema.index({ clerkId: 1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {

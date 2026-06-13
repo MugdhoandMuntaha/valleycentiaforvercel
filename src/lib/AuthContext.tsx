@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
+import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/nextjs';
 
 /* ===== Types ===== */
 export type UserRole = 'customer' | 'admin';
@@ -16,7 +16,7 @@ export interface UserProfile {
     role: UserRole;
 }
 
-// Extend session user type
+// Session user type — maintained for backward compatibility
 interface SessionUser {
     id: string;
     email: string;
@@ -46,26 +46,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /* ===== Provider ===== */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const { data: session, status, update } = useSession();
+    const { user: clerkUser, isLoaded } = useUser();
+    const { signOut: clerkSignOut, openSignIn, openSignUp } = useClerk();
+    const { userId } = useClerkAuth();
     const [profileOverrides, setProfileOverrides] = useState<Partial<UserProfile>>({});
 
-    const loading = status === 'loading';
+    const loading = !isLoaded;
 
     const user: SessionUser | null = useMemo(() => {
-        if (!session?.user) return null;
-        const u = session.user as Record<string, unknown>;
+        if (!clerkUser || !userId) return null;
+
+        const primaryEmail = clerkUser.primaryEmailAddress?.emailAddress || '';
+        const fullName = clerkUser.fullName || null;
+        const displayName = clerkUser.firstName || clerkUser.username || primaryEmail.split('@')[0] || null;
+        const avatarUrl = clerkUser.imageUrl || null;
+
+        // Check for admin role in public metadata
+        const role = ((clerkUser.publicMetadata?.role as string) || 'customer') as UserRole;
+
         return {
-            id: (u.id as string) || '',
-            email: (u.email as string) || '',
-            name: (u.name as string) || null,
-            image: (u.image as string) || null,
-            role: ((u.role as UserRole) || 'customer'),
-            fullName: (u.fullName as string) || null,
-            displayName: (u.displayName as string) || null,
-            avatarUrl: (u.avatarUrl as string) || (u.image as string) || null,
-            createdAt: (u.createdAt as string) || null,
+            id: userId,
+            email: primaryEmail,
+            name: fullName || displayName,
+            image: avatarUrl,
+            role,
+            fullName,
+            displayName,
+            avatarUrl,
+            createdAt: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : null,
         };
-    }, [session]);
+    }, [clerkUser, userId]);
 
     const role: UserRole = user?.role || 'customer';
 
@@ -82,69 +92,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [user, profileOverrides]);
 
-    const signIn = useCallback(async (email: string, password: string) => {
+    // Clerk manages sign-in/sign-up via its own UI.
+    // These methods open the Clerk modal or redirect to Clerk's sign-in page.
+    const signIn = useCallback(async (_email: string, _password: string) => {
         try {
-            const result = await nextAuthSignIn('credentials', {
-                email,
-                password,
-                redirect: false,
-            });
-
-            if (result?.error) {
-                return { error: { message: result.error } };
-            }
+            openSignIn();
             return { error: null };
         } catch (err) {
             return { error: { message: err instanceof Error ? err.message : 'Sign in failed' } };
         }
-    }, []);
+    }, [openSignIn]);
 
-    const signUp = useCallback(async (email: string, password: string, name: string) => {
+    const signUp = useCallback(async (_email: string, _password: string, _name: string) => {
         try {
-            // Call custom register endpoint
-            const res = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, name }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                return { error: { message: data.error || 'Registration failed' } };
-            }
-
-            // Auto sign-in after registration
-            const signInResult = await nextAuthSignIn('credentials', {
-                email,
-                password,
-                redirect: false,
-            });
-
-            if (signInResult?.error) {
-                // Registration succeeded but auto-login failed — still a success
-                return { error: null };
-            }
-
+            openSignUp();
             return { error: null };
         } catch (err) {
-            return { error: { message: err instanceof Error ? err.message : 'Registration failed' } };
+            return { error: { message: err instanceof Error ? err.message : 'Sign up failed' } };
         }
-    }, []);
+    }, [openSignUp]);
 
     const signInWithGoogle = useCallback(async () => {
         try {
-            await nextAuthSignIn('google', { callbackUrl: '/profile' });
+            openSignIn();
             return { error: null };
         } catch (err) {
             return { error: { message: err instanceof Error ? err.message : 'Google sign in failed' } };
         }
-    }, []);
+    }, [openSignIn]);
 
     const signOutFn = useCallback(async () => {
         setProfileOverrides({});
-        await nextAuthSignOut({ callbackUrl: '/' });
-    }, []);
+        await clerkSignOut({ redirectUrl: '/' });
+    }, [clerkSignOut]);
 
     const updateProfile = useCallback(async (updates: Partial<Omit<UserProfile, 'role'>>) => {
         if (!user) return { error: 'Not authenticated' };
@@ -165,20 +145,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Update local state
             setProfileOverrides(prev => ({ ...prev, ...updates }));
 
-            // Trigger NextAuth session update to refresh JWT
-            await update();
-
             return { error: null };
         } catch (err) {
             return { error: err instanceof Error ? err.message : 'Failed to update profile' };
         }
-    }, [user, update]);
+    }, [user]);
 
     const refreshProfile = useCallback(async () => {
-        if (user) {
-            await update();
+        // Clerk automatically handles user data refresh
+        if (clerkUser) {
+            await clerkUser.reload();
         }
-    }, [user, update]);
+    }, [clerkUser]);
 
     return (
         <AuthContext.Provider value={{

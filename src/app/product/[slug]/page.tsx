@@ -57,7 +57,7 @@ interface ProductDetail {
     howToUse: string;
     ingredients: string;
     keyBenefits: { icon: string; title: string; desc: string }[];
-    sizes: { label: string; ml: string; price: number; active?: boolean }[];
+    sizes: { label: string; ml: string; price: number; active?: boolean; stockQuantity?: number }[];
     inStock: boolean;
     stockQuantity: number;
 }
@@ -93,7 +93,8 @@ function mapSupabaseToDisplay(p: SupabaseProduct): ProductDetail {
             ml: s.ml || '',
             price: Math.ceil(s.price),
             active: s.is_default,
-        })) : [{ label: 'Default', ml: '', price: Math.ceil(p.base_price), active: true }],
+            stockQuantity: s.stockQuantity !== undefined ? s.stockQuantity : 0,
+        })) : [{ label: 'Default', ml: '', price: Math.ceil(p.base_price), active: true, stockQuantity: p.stock_quantity }],
         inStock: p.in_stock,
         stockQuantity: p.stock_quantity || 0,
     };
@@ -151,6 +152,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
     const [related, setRelated] = useState<ProductDetail[]>([]);
     const [loading, setLoading] = useState(true);
     const [freeShippingThreshold, setFreeShippingThreshold] = useState(499);
+
+    const handleReviewSubmitted = (rating: number) => {
+        setProduct(prev => {
+            if (!prev) return null;
+            const currentCount = Number(prev.reviewCount) || 0;
+            const newCount = currentCount + 1;
+            const currentAvg = prev.rating || 0;
+            const newAvg = Math.round(((currentAvg * currentCount + rating) / newCount) * 10) / 10;
+            return {
+                ...prev,
+                reviewCount: String(newCount),
+                rating: newAvg,
+            };
+        });
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -248,8 +264,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             {/* Tabbed Content */}
             <TabbedContent product={product} />
 
-            {/* Trust Strip */}
-            <TrustStrip freeShippingThreshold={freeShippingThreshold} />
+            {/* Reviews Section */}
+            <ReviewsSection product={product} onReviewSubmitted={handleReviewSubmitted} />
 
             {/* Related Products */}
             {related.length > 0 && <RelatedProducts products={related} />}
@@ -350,7 +366,7 @@ function ImageGallery({ images, title, badges }: { images: string[]; title: stri
                     className="pdp-main-image"
                     onClick={() => openLightbox(activeIndex)}
                     style={{
-                        position: 'relative', height: 'calc(100vh - 190px)', width: '500px', borderRadius: '16px',
+                        position: 'relative', height: '65vh', width: '31vw', borderRadius: '16px',
                         overflow: 'hidden', background: '#f8f6f3',
                         border: '1px solid #f0f0f0', cursor: 'zoom-in',
                     }}
@@ -369,7 +385,7 @@ function ImageGallery({ images, title, badges }: { images: string[]; title: stri
                                 alt={title}
                                 fill
                                 sizes="(max-width: 768px) 100vw, 45vw"
-                                style={{ objectFit: 'cover' }}
+                                style={{ objectFit: 'contain' }}
                                 priority
                             />
                         </motion.div>
@@ -566,8 +582,15 @@ function ImageGallery({ images, title, badges }: { images: string[]; title: stri
 /* ===== Product Info ===== */
 function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetail; freeShippingThreshold: number }) {
     const [quantity, setQuantity] = useState(1);
-    const defaultIdx = product.sizes.findIndex((s) => s.active);
-    const [selectedSizeIdx, setSelectedSizeIdx] = useState(defaultIdx >= 0 ? defaultIdx : 0);
+    const initialSizeIdx = (() => {
+        const idx = product.sizes.findIndex(s => s.active && (s.stockQuantity === undefined || s.stockQuantity > 0));
+        if (idx >= 0) return idx;
+        const fallbackIdx = product.sizes.findIndex(s => s.stockQuantity === undefined || s.stockQuantity > 0);
+        if (fallbackIdx >= 0) return fallbackIdx;
+        const defaultIdx = product.sizes.findIndex(s => s.active);
+        return defaultIdx >= 0 ? defaultIdx : 0;
+    })();
+    const [selectedSizeIdx, setSelectedSizeIdx] = useState(initialSizeIdx);
     const [showAdded, setShowAdded] = useState(false);
     const { addToCart } = useCart();
     const { isWishlisted, toggleWishlist } = useWishlist();
@@ -575,9 +598,10 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
     const router = useRouter();
 
     const currentSize = product.sizes[selectedSizeIdx] || product.sizes[0];
+    const isCurrentSizeInStock = product.inStock && (currentSize ? (currentSize.stockQuantity === undefined || currentSize.stockQuantity > 0) : true);
 
     const handleAddToCart = () => {
-        if (!product.inStock) return;
+        if (!isCurrentSizeInStock) return;
         addToCart({
             id: String(product.id),
             slug: product.slug,
@@ -586,12 +610,13 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             price: currentSize.price,
             originalPrice: product.originalPrice,
             size: currentSize.label,
+            stockQuantity: currentSize.stockQuantity,
         }, quantity);
         setShowAdded(true);
     };
 
     const handleBuyNow = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!product.inStock) return;
+        if (!isCurrentSizeInStock) return;
         const btn = e.currentTarget;
         if (btn) {
             btn.style.background = '#1a1a1a';
@@ -606,6 +631,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             price: currentSize.price,
             originalPrice: product.originalPrice,
             size: currentSize.label,
+            stockQuantity: currentSize.stockQuantity,
         }, quantity);
         router.push('/cart');
     };
@@ -732,32 +758,43 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                     Select Size
                 </p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {product.sizes.map((size, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => setSelectedSizeIdx(idx)}
-                            style={{
-                                padding: '7px 16px', borderRadius: '8px', cursor: 'pointer',
-                                fontSize: '12px', fontWeight: 600, transition: 'all 0.2s ease',
-                                fontFamily: "'Inter', sans-serif",
-                                background: selectedSizeIdx === idx ? '#1a1a1a' : '#fff',
-                                color: selectedSizeIdx === idx ? '#fff' : '#1a1a1a',
-                                border: selectedSizeIdx === idx ? '2px solid #1a1a1a' : '2px solid #e0e0e0',
-                            }}
-                            onMouseEnter={(e) => {
-                                if (selectedSizeIdx !== idx) {
-                                    e.currentTarget.style.borderColor = '#999';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (selectedSizeIdx !== idx) {
-                                    e.currentTarget.style.borderColor = '#e0e0e0';
-                                }
-                            }}
-                        >
-                            {size.label}{size.ml ? `  ${size.ml}` : ''} — ৳{size.price}
-                        </button>
-                    ))}
+                    {product.sizes.map((size, idx) => {
+                        const isSizeOutOfStock = size.stockQuantity !== undefined && size.stockQuantity <= 0;
+                        return (
+                            <button
+                                key={idx}
+                                onClick={() => setSelectedSizeIdx(idx)}
+                                style={{
+                                    padding: '7px 16px', borderRadius: '8px', cursor: 'pointer',
+                                    fontSize: '12px', fontWeight: 600, transition: 'all 0.2s ease',
+                                    fontFamily: "'Inter', sans-serif",
+                                    background: selectedSizeIdx === idx 
+                                        ? '#1a1a1a' 
+                                        : (isSizeOutOfStock ? '#f5f5f5' : '#fff'),
+                                    color: selectedSizeIdx === idx 
+                                        ? '#fff' 
+                                        : (isSizeOutOfStock ? '#bbb' : '#1a1a1a'),
+                                    border: selectedSizeIdx === idx 
+                                        ? '2px solid #1a1a1a' 
+                                        : (isSizeOutOfStock ? '2px dashed #ddd' : '2px solid #e0e0e0'),
+                                    opacity: isSizeOutOfStock ? 0.6 : 1,
+                                    textDecoration: isSizeOutOfStock ? 'line-through' : 'none',
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (selectedSizeIdx !== idx && !isSizeOutOfStock) {
+                                        e.currentTarget.style.borderColor = '#999';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (selectedSizeIdx !== idx && !isSizeOutOfStock) {
+                                        e.currentTarget.style.borderColor = '#e0e0e0';
+                                    }
+                                }}
+                            >
+                                {size.label}{size.ml ? `  ${size.ml}` : ''} — ৳{size.price}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -785,7 +822,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                         }}>
                             {quantity}
                         </span>
-                        <button onClick={() => setQuantity(Math.min(product.stockQuantity, quantity + 1))} style={{
+                        <button onClick={() => setQuantity(Math.min(currentSize.stockQuantity !== undefined ? currentSize.stockQuantity : product.stockQuantity, quantity + 1))} style={{
                             width: '38px', height: '40px', border: 'none', background: '#fafafa',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'background 0.15s',
@@ -816,7 +853,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
 
             {/* Add to Cart + Buy Now Row */}
             <div className="pdp-action-buttons" style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
-                {product.inStock ? (
+                {isCurrentSizeInStock ? (
                     <>
                         {/* Add to Cart */}
                         <button
@@ -852,7 +889,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                             BUY NOW
                         </button>
                     </>
-                ) : (
+                ) : !product.inStock ? (
                     /* Wishlist Button */
                     <button
                         onClick={() => toggleWishlist(product.id)}
@@ -885,6 +922,19 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                     >
                         <Heart size={16} fill={wishlisted ? '#ef4444' : 'none'} color={wishlisted ? '#ef4444' : '#1a1a1a'} />
                         {wishlisted ? 'REMOVE FROM WISHLIST' : 'ADD TO WISHLIST'}
+                    </button>
+                ) : (
+                    /* Size Out of Stock Button */
+                    <button
+                        disabled
+                        style={{
+                            width: '82%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: '#e0e0e0', color: '#888', border: 'none', borderRadius: '10px',
+                            fontSize: '12px', fontWeight: 700, letterSpacing: '0.5px', cursor: 'not-allowed',
+                            textTransform: 'uppercase', fontFamily: "'Inter', sans-serif",
+                        }}
+                    >
+                        OUT OF STOCK (THIS SIZE)
                     </button>
                 )}
             </div>
@@ -973,99 +1023,12 @@ function KeyBenefitsStrip({ benefits }: { benefits: { icon: string; title: strin
 
 /* ===== Tabbed Content ===== */
 function TabbedContent({ product }: { product: ProductDetail }) {
-    const [activeTab, setActiveTab] = useState<'description' | 'howToUse' | 'ingredients' | 'reviews'>('description');
-    const [reviews, setReviews] = useState<Review[]>([]);
-    const [reviewLoading, setReviewLoading] = useState(false);
-    const { user } = useAuth();
-    const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', body: '' });
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [uploadedImages, setUploadedImages] = useState<string[]>([]);
-    const [uploading, setUploading] = useState(false);
-
-    useEffect(() => {
-        if (activeTab === 'reviews' && reviews.length === 0) {
-            setReviewLoading(true);
-            getProductReviews(product.id).then(data => {
-                setReviews(data);
-                setReviewLoading(false);
-            });
-        }
-    }, [activeTab, product.id, reviews.length]);
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const res = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-            const data = await res.json();
-            if (data.url) {
-                setUploadedImages(prev => [...prev, data.url]);
-            } else if (data.error) {
-                alert(data.error);
-            }
-        } catch (err) {
-            console.error('Error uploading image:', err);
-            alert('Upload failed');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleSubmitReview = async () => {
-        if (!user?.id || reviewForm.rating < 1) return;
-        setSubmitting(true);
-        const { error } = await submitReview({
-            product_id: product.id,
-            user_id: user.id,
-            rating: reviewForm.rating,
-            title: reviewForm.title,
-            body: reviewForm.body,
-            images: uploadedImages.map((url, idx) => ({
-                url,
-                altText: 'Review Image',
-                sortOrder: idx
-            })),
-        });
-        setSubmitting(false);
-        if (!error) {
-            setSubmitted(true);
-            const newReview: Review = {
-                id: 'temp-' + Date.now(),
-                product_id: product.id,
-                user_id: user.id,
-                rating: reviewForm.rating,
-                title: reviewForm.title || null,
-                body: reviewForm.body || null,
-                is_verified: false,
-                helpful_count: 0,
-                created_at: new Date().toISOString(),
-                user_name: user.displayName || user.fullName || 'You',
-                images: uploadedImages.map((url, idx) => ({
-                    url,
-                    altText: 'Review Image',
-                    sortOrder: idx
-                }))
-            };
-            setReviews(prev => [newReview, ...prev]);
-            setReviewForm({ rating: 5, title: '', body: '' });
-            setUploadedImages([]);
-        }
-    };
+    const [activeTab, setActiveTab] = useState<'description' | 'howToUse' | 'ingredients'>('description');
 
     const tabs = [
         { key: 'description' as const, label: 'Description' },
         { key: 'howToUse' as const, label: 'How to Use' },
         { key: 'ingredients' as const, label: 'Ingredients' },
-        { key: 'reviews' as const, label: `Reviews (${product.reviewCount})` },
     ];
 
     const textContent: Record<string, string> = {
@@ -1073,12 +1036,6 @@ function TabbedContent({ product }: { product: ProductDetail }) {
         howToUse: product.howToUse,
         ingredients: product.ingredients,
     };
-
-    // Rating distribution
-    const ratingDist = [5, 4, 3, 2, 1].map(star => {
-        const count = reviews.filter(r => r.rating === star).length;
-        return { star, count, pct: reviews.length > 0 ? (count / reviews.length) * 100 : 0 };
-    });
 
     return (
         <section className="pdp-tabs-section" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 48px 56px' }}>
@@ -1117,330 +1074,409 @@ function TabbedContent({ product }: { product: ProductDetail }) {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.25 }}
                 >
-                    {activeTab !== 'reviews' ? (
-                        <div style={{
-                            fontFamily: "'Inter', sans-serif", fontSize: '15px', lineHeight: 1.8,
-                            color: '#555', maxWidth: '800px',
-                            wordBreak: 'break-word', overflowWrap: 'anywhere',
-                        }}>
-                            {textContent[activeTab]}
-                        </div>
-                    ) : (
-                        <div>
-                            {reviewLoading ? (
-                                <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
-                                    Loading reviews...
-                                </div>
-                            ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '48px', alignItems: 'start' }} className="review-grid">
-                                    {/* Rating Summary */}
-                                    <div style={{
-                                        background: '#fafafa', borderRadius: '16px', padding: '24px',
-                                        border: '1px solid #f0f0f0',
-                                    }}>
-                                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                                            <div style={{ fontSize: '48px', fontWeight: 800, color: '#1a1a1a', lineHeight: 1 }}>
-                                                {product.rating}
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', margin: '8px 0' }}>
-                                                {[1, 2, 3, 4, 5].map(s => (
-                                                    <Star key={s} size={18}
-                                                        fill={s <= Math.round(product.rating) ? '#e67e22' : 'none'}
-                                                        stroke="#e67e22" />
-                                                ))}
-                                            </div>
-                                            <div style={{ fontSize: '13px', color: '#888' }}>
-                                                Based on {product.reviewCount} reviews
-                                            </div>
-                                        </div>
-                                        {/* Distribution bars */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {ratingDist.map(rd => (
-                                                <div key={rd.star} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#555', width: '14px' }}>{rd.star}</span>
-                                                    <Star size={12} fill="#e67e22" stroke="#e67e22" />
-                                                    <div style={{
-                                                        flex: 1, height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden',
-                                                    }}>
-                                                        <div style={{
-                                                            width: `${rd.pct}%`, height: '100%',
-                                                            background: '#e67e22', borderRadius: '4px',
-                                                            transition: 'width 0.5s ease',
-                                                        }} />
-                                                    </div>
-                                                    <span style={{ fontSize: '12px', color: '#999', width: '24px', textAlign: 'right' }}>{rd.count}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Reviews list + form */}
-                                    <div>
-                                        {/* Write review form */}
-                                        {user ? (
-                                            <div style={{
-                                                background: '#fafafa', borderRadius: '16px', padding: '24px',
-                                                border: '1px solid #f0f0f0', marginBottom: '32px',
-                                            }}>
-                                                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#1a1a1a' }}>
-                                                    Write a Review
-                                                </h4>
-                                                {submitted ? (
-                                                    <div style={{
-                                                        padding: '16px', background: '#e8f5e9', borderRadius: '10px',
-                                                        color: '#2e7d32', fontSize: '14px', fontWeight: 600, textAlign: 'center',
-                                                    }}>
-                                                        ✓ Thank you! Your review has been submitted for moderation.
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {/* Star selector */}
-                                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-                                                            {[1, 2, 3, 4, 5].map(s => (
-                                                                <button key={s}
-                                                                    onClick={() => setReviewForm(p => ({ ...p, rating: s }))}
-                                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
-                                                                >
-                                                                    <Star size={24}
-                                                                        fill={s <= reviewForm.rating ? '#e67e22' : 'none'}
-                                                                        stroke="#e67e22"
-                                                                        strokeWidth={2} />
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        <input
-                                                            placeholder="Review title (optional)"
-                                                            value={reviewForm.title}
-                                                            onChange={e => setReviewForm(p => ({ ...p, title: e.target.value }))}
-                                                            style={{
-                                                                width: '100%', padding: '10px 14px', borderRadius: '10px',
-                                                                border: '1px solid #e0e0e0', fontSize: '14px', marginBottom: '10px',
-                                                                fontFamily: "'Inter', sans-serif", outline: 'none',
-                                                                color: '#000000',
-                                                            }}
-                                                        />
-                                                        <textarea
-                                                            placeholder="Share your experience..."
-                                                            value={reviewForm.body}
-                                                            onChange={e => setReviewForm(p => ({ ...p, body: e.target.value }))}
-                                                            rows={4}
-                                                            style={{
-                                                                width: '100%', padding: '10px 14px', borderRadius: '10px',
-                                                                border: '1px solid #e0e0e0', fontSize: '14px', marginBottom: '14px',
-                                                                fontFamily: "'Inter', sans-serif", outline: 'none', resize: 'vertical',
-                                                                color: '#000000',
-                                                            }}
-                                                        />
-
-                                                        {/* Upload images */}
-                                                        <div style={{ marginBottom: '14px' }}>
-                                                            <label style={{
-                                                                display: 'block', fontSize: '12px', fontWeight: 600,
-                                                                color: '#555', marginBottom: '6px',
-                                                            }}>
-                                                                Add Photos (Optional)
-                                                            </label>
-                                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                                                {uploadedImages.map((url, i) => (
-                                                                    <div key={i} style={{
-                                                                        position: 'relative', width: '60px', height: '60px',
-                                                                        borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
-                                                                    }}>
-                                                                        <Image src={url} alt="Uploaded preview" fill style={{ objectFit: 'cover' }} />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
-                                                                            style={{
-                                                                                position: 'absolute', top: '2px', right: '2px',
-                                                                                background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%',
-                                                                                width: '18px', height: '18px', display: 'flex', alignItems: 'center',
-                                                                                justifyContent: 'center', color: '#fff', cursor: 'pointer', fontSize: '10px',
-                                                                                lineHeight: 1, padding: 0,
-                                                                            }}
-                                                                        >
-                                                                            ✕
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                                {uploadedImages.length < 5 && (
-                                                                    <label style={{
-                                                                        width: '60px', height: '60px', borderRadius: '8px',
-                                                                        border: '2px dashed #ccc', display: 'flex', flexDirection: 'column',
-                                                                        alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                                                                        background: '#fff', transition: 'all 0.2s',
-                                                                    }}
-                                                                        onMouseEnter={(e) => e.currentTarget.style.borderColor = '#1a1a1a'}
-                                                                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ccc'}
-                                                                    >
-                                                                        <span style={{ fontSize: '18px', color: '#666', fontWeight: 'bold', lineHeight: 1 }}>+</span>
-                                                                        <span style={{ fontSize: '9px', color: '#888' }}>Upload</span>
-                                                                        <input
-                                                                            type="file"
-                                                                            accept="image/*"
-                                                                            onChange={handleImageUpload}
-                                                                            style={{ display: 'none' }}
-                                                                        />
-                                                                    </label>
-                                                                )}
-                                                            </div>
-                                                            {uploading && (
-                                                                <span style={{ fontSize: '11px', color: '#666', marginTop: '4px', display: 'block' }}>
-                                                                    Uploading photo...
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        <button
-                                                            onClick={handleSubmitReview}
-                                                            disabled={submitting || uploading}
-                                                            style={{
-                                                                padding: '10px 24px', background: '#1a1a1a', color: '#fff',
-                                                                border: 'none', borderRadius: '10px', fontSize: '14px',
-                                                                fontWeight: 600, cursor: (submitting || uploading) ? 'not-allowed' : 'pointer',
-                                                                opacity: (submitting || uploading) ? 0.6 : 1,
-                                                            }}
-                                                        >
-                                                            {submitting ? 'Submitting...' : 'Submit Review'}
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div style={{
-                                                padding: '20px', background: '#fff8e1', borderRadius: '12px',
-                                                border: '1px solid #fef3cd', marginBottom: '32px',
-                                                fontSize: '14px', color: '#856404', textAlign: 'center',
-                                            }}>
-                                                <a href="/auth" style={{ color: '#2e7d32', fontWeight: 700, textDecoration: 'underline' }}>Sign in</a>
-                                                {' '}to write a review
-                                            </div>
-                                        )}
-
-                                        {/* Review list */}
-                                        {reviews.length === 0 ? (
-                                            <div style={{ textAlign: 'center', padding: '32px', color: '#999', fontSize: '14px' }}>
-                                                No reviews yet. Be the first to review this product!
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                                {reviews.map(review => (
-                                                    <div key={review.id} style={{
-                                                        padding: '20px', borderRadius: '14px', border: '1px solid #f0f0f0',
-                                                        background: '#fff',
-                                                    }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                                                            <div style={{ display: 'flex', gap: '2px' }}>
-                                                                {[1, 2, 3, 4, 5].map(s => (
-                                                                    <Star key={s} size={14}
-                                                                        fill={s <= review.rating ? '#e67e22' : 'none'}
-                                                                        stroke="#e67e22" />
-                                                                ))}
-                                                            </div>
-                                                            {review.is_verified && (
-                                                                <span style={{
-                                                                    fontSize: '11px', fontWeight: 600, color: '#2e7d32',
-                                                                    background: '#e8f5e9', padding: '2px 8px', borderRadius: '4px',
-                                                                }}>Verified Purchase</span>
-                                                            )}
-                                                        </div>
-                                                        {review.title && (
-                                                            <h5 style={{
-                                                                fontSize: '15px', fontWeight: 600, color: '#1a1a1a',
-                                                                marginBottom: '6px', fontFamily: "'Inter', sans-serif",
-                                                            }}>{review.title}</h5>
-                                                        )}
-                                                        {review.body && (
-                                                            <p style={{
-                                                                fontSize: '14px', color: '#555', lineHeight: 1.6,
-                                                                marginBottom: '10px',
-                                                            }}>{review.body}</p>
-                                                        )}
-                                                        {review.images && review.images.length > 0 && (
-                                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', marginBottom: '14px' }}>
-                                                                {review.images.map((img, idx) => (
-                                                                    <div key={idx} style={{
-                                                                        position: 'relative', width: '80px', height: '80px',
-                                                                        borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
-                                                                    }}>
-                                                                        <Image
-                                                                            src={img.url}
-                                                                            alt={img.altText || `Review Image ${idx + 1}`}
-                                                                            fill
-                                                                            style={{ objectFit: 'cover' }}
-                                                                        />
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#999' }}>
-                                                            <span style={{ fontWeight: 600, color: '#666' }}>{review.user_name}</span>
-                                                            <span>•</span>
-                                                            <span>{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <div style={{
+                        fontFamily: "'Inter', sans-serif", fontSize: '15px', lineHeight: 1.8,
+                        color: '#555', maxWidth: '800px',
+                        wordBreak: 'break-word', overflowWrap: 'anywhere',
+                    }}>
+                        {textContent[activeTab]}
+                    </div>
                 </motion.div>
             </AnimatePresence>
         </section>
     );
 }
 
-/* ===== Trust Strip ===== */
-function TrustStrip({ freeShippingThreshold }: { freeShippingThreshold: number }) {
-    const items = [
-        { icon: Truck, label: 'Free Delivery', desc: `On orders above ৳${freeShippingThreshold}` },
-        { icon: RotateCcw, label: '3-Day Returns', desc: 'Easy return policy' },
-        { icon: ShieldCheck, label: '100% Genuine', desc: 'Authentic products only' },
-        { icon: Star, label: '4.7★ Avg Rating', desc: 'Loved by thousands' },
-    ];
+/* ===== Reviews Section ===== */
+function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail; onReviewSubmitted: (rating: number) => void }) {
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [reviewLoading, setReviewLoading] = useState(true);
+    const { user } = useAuth();
+    const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', body: '' });
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [showAllReviews, setShowAllReviews] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        getProductReviews(product.id).then(data => {
+            if (active) {
+                setReviews(data);
+                setReviewLoading(false);
+            }
+        });
+        return () => { active = false; };
+    }, [product.id]);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.url) {
+                setUploadedImages(prev => [...prev, data.url]);
+            } else if (data.error) {
+                alert(data.error);
+            }
+        } catch (err) {
+            console.error('Error uploading image:', err);
+            alert('Upload failed');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (!user?.id || reviewForm.rating < 1) return;
+        setSubmitting(true);
+        setSubmitError(null);
+        const { error } = await submitReview({
+            product_id: product.id,
+            user_id: user.id,
+            rating: reviewForm.rating,
+            title: reviewForm.title,
+            body: reviewForm.body,
+            images: uploadedImages.map((url, idx) => ({
+                url,
+                altText: 'Review Image',
+                sortOrder: idx
+            })),
+        });
+        setSubmitting(false);
+        if (!error) {
+            setSubmitted(true);
+            const newReview: Review = {
+                id: 'temp-' + Date.now(),
+                product_id: product.id,
+                user_id: user.id,
+                rating: reviewForm.rating,
+                title: reviewForm.title || null,
+                body: reviewForm.body || null,
+                is_verified: false,
+                helpful_count: 0,
+                created_at: new Date().toISOString(),
+                user_name: user.displayName || user.fullName || 'You',
+                images: uploadedImages.map((url, idx) => ({
+                    url,
+                    altText: 'Review Image',
+                    sortOrder: idx
+                }))
+            };
+            setReviews(prev => [newReview, ...prev]);
+            setReviewForm({ rating: 5, title: '', body: '' });
+            setUploadedImages([]);
+            onReviewSubmitted(reviewForm.rating);
+        } else {
+            if (error.includes('E11000') || error.toLowerCase().includes('duplicate key')) {
+                setSubmitError('You have already submitted a review for this product.');
+            } else {
+                setSubmitError(error || 'Failed to submit review.');
+            }
+        }
+    };
+
+    const ratingDist = [5, 4, 3, 2, 1].map(star => {
+        const count = reviews.filter(r => r.rating === star).length;
+        return { star, count, pct: reviews.length > 0 ? (count / reviews.length) * 100 : 0 };
+    });
+
     return (
-        <section style={{
-            background: '#1a1a1a', padding: '36px 0',
-        }}>
-            <div style={{
-                maxWidth: '1400px', margin: '0 auto', padding: '0 48px',
-                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px',
-            }} className="trust-grid">
-                {items.map((item, i) => (
-                    <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: '14px',
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        background: 'rgba(255,255,255,0.04)',
+        <section className="pdp-reviews-section" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 48px 56px' }}>
+            <h2 style={{
+                fontFamily: "'Outfit', sans-serif", fontSize: '26px', fontWeight: 700,
+                color: '#1a1a1a', marginBottom: '24px',
+            }}>
+                Customer Reviews
+            </h2>
+            {reviewLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                    Loading reviews...
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '48px', alignItems: 'start' }} className="review-grid">
+                    {/* Rating Summary */}
+                    <div style={{
+                        background: '#fafafa', borderRadius: '16px', padding: '24px',
+                        border: '1px solid #f0f0f0',
                     }}>
-                        <div style={{
-                            width: '40px', height: '40px', borderRadius: '10px',
-                            background: 'rgba(245,197,24,0.12)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0,
-                        }}>
-                            <item.icon size={20} style={{ color: '#f5c518' }} />
+                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '48px', fontWeight: 800, color: '#1a1a1a', lineHeight: 1 }}>
+                                {product.rating}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', margin: '8px 0' }}>
+                                {[1, 2, 3, 4, 5].map(s => (
+                                    <Star key={s} size={18}
+                                        fill={s <= Math.round(product.rating) ? '#e67e22' : 'none'}
+                                        stroke="#e67e22" />
+                                ))}
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#888' }}>
+                                Based on {product.reviewCount} reviews
+                            </div>
                         </div>
-                        <div>
-                            <span style={{
-                                fontFamily: "'Inter', sans-serif", fontSize: '13px',
-                                fontWeight: 700, color: '#ffffff', display: 'block',
-                                lineHeight: 1.3,
-                            }}>
-                                {item.label}
-                            </span>
-                            <span style={{
-                                fontFamily: "'Inter', sans-serif", fontSize: '11px', color: '#999',
-                                lineHeight: 1.3,
-                            }}>
-                                {item.desc}
-                            </span>
+                        {/* Distribution bars */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {ratingDist.map(rd => (
+                                <div key={rd.star} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#555', width: '14px' }}>{rd.star}</span>
+                                    <Star size={12} fill="#e67e22" stroke="#e67e22" />
+                                    <div style={{
+                                        flex: 1, height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden',
+                                    }}>
+                                        <div style={{
+                                            width: `${rd.pct}%`, height: '100%',
+                                            background: '#e67e22', borderRadius: '4px',
+                                            transition: 'width 0.5s ease',
+                                        }} />
+                                    </div>
+                                    <span style={{ fontSize: '12px', color: '#999', width: '24px', textAlign: 'right' }}>{rd.count}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                ))}
-            </div>
+
+                    {/* Reviews list + form */}
+                    <div>
+                        {/* Write review form */}
+                        {user ? (
+                            <div style={{
+                                background: '#fafafa', borderRadius: '16px', padding: '24px',
+                                border: '1px solid #f0f0f0', marginBottom: '32px',
+                            }}>
+                                <h4 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#1a1a1a' }}>
+                                    Write a Review
+                                </h4>
+                                {submitted ? (
+                                    <div style={{
+                                        padding: '16px', background: '#e8f5e9', borderRadius: '10px',
+                                        color: '#2e7d32', fontSize: '14px', fontWeight: 600, textAlign: 'center',
+                                    }}>
+                                        ✓ Thank you! Your review has been submitted for moderation.
+                                    </div>
+                                ) : (
+                                    <>
+                                        {submitError && (
+                                            <div style={{
+                                                padding: '12px 16px', background: '#ffebee', borderRadius: '10px',
+                                                color: '#c62828', fontSize: '13px', fontWeight: 600, marginBottom: '14px',
+                                            }}>
+                                                ⚠️ {submitError}
+                                            </div>
+                                        )}
+                                        {/* Star selector */}
+                                        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+                                            {[1, 2, 3, 4, 5].map(s => (
+                                                <button key={s}
+                                                    onClick={() => setReviewForm(p => ({ ...p, rating: s }))}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
+                                                >
+                                                    <Star size={24}
+                                                        fill={s <= reviewForm.rating ? '#ffb700ff' : 'none'}
+                                                        stroke="#ffb700ff"
+                                                        strokeWidth={2} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <input
+                                            placeholder="Review title (optional)"
+                                            value={reviewForm.title}
+                                            onChange={e => setReviewForm(p => ({ ...p, title: e.target.value }))}
+                                            style={{
+                                                width: '100%', padding: '10px 14px', borderRadius: '10px',
+                                                border: '1px solid #e0e0e0', fontSize: '14px', marginBottom: '10px',
+                                                fontFamily: "'Inter', sans-serif", outline: 'none',color: 'black'
+                                            }}
+                                        />
+                                        <textarea
+                                            placeholder="Write your review here..."
+                                            value={reviewForm.body}
+                                            onChange={e => setReviewForm(p => ({ ...p, body: e.target.value }))}
+                                            rows={4}
+                                            style={{
+                                                width: '100%', padding: '10px 14px', borderRadius: '10px',
+                                                border: '1px solid #e0e0e0', fontSize: '14px', marginBottom: '12px',
+                                                fontFamily: "'Inter', sans-serif", resize: 'none', outline: 'none',color: 'black'
+                                            }}
+                                        />
+
+                                        {/* Image Upload */}
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#666', marginBottom: '8px', display: 'block' }}>
+                                                Add Photos (optional)
+                                            </span>
+                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                {uploadedImages.map((url, idx) => (
+                                                    <div key={idx} style={{
+                                                        position: 'relative', width: '56px', height: '56px',
+                                                        borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
+                                                    }}>
+                                                        <Image src={url} alt="Uploaded" fill style={{ objectFit: 'cover' }} />
+                                                    </div>
+                                                ))}
+                                                {uploadedImages.length < 5 && (
+                                                    <label style={{
+                                                        width: '56px', height: '56px', borderRadius: '8px',
+                                                        border: '2px dashed #ccc', display: 'flex', flexDirection: 'column',
+                                                        alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                                        background: '#fff', transition: 'all 0.2s',
+                                                    }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.borderColor = '#1a1a1a'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#ccc'}
+                                                    >
+                                                        <span style={{ fontSize: '18px', color: '#666', fontWeight: 'bold', lineHeight: 1 }}>+</span>
+                                                        <span style={{ fontSize: '9px', color: '#888' }}>Upload</span>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleImageUpload}
+                                                            style={{ display: 'none' }}
+                                                        />
+                                                    </label>
+                                                )}
+                                            </div>
+                                            {uploading && (
+                                                <span style={{ fontSize: '11px', color: '#666', marginTop: '4px', display: 'block' }}>
+                                                    Uploading photo...
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={handleSubmitReview}
+                                            disabled={submitting || uploading}
+                                            style={{
+                                                padding: '10px 24px', background: '#1a1a1a', color: '#fff',
+                                                border: 'none', borderRadius: '10px', fontSize: '14px',
+                                                fontWeight: 600, cursor: (submitting || uploading) ? 'not-allowed' : 'pointer',
+                                                opacity: (submitting || uploading) ? 0.6 : 1,
+                                            }}
+                                        >
+                                            {submitting ? 'Submitting...' : 'Submit Review'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{
+                                padding: '20px', background: '#fff8e1', borderRadius: '12px',
+                                border: '1px solid #fef3cd', marginBottom: '32px',
+                                fontSize: '14px', color: '#856404', textAlign: 'center',
+                            }}>
+                                <a href="/auth" style={{ color: '#2e7d32', fontWeight: 700, textDecoration: 'underline' }}>Sign in</a>
+                                {' '}to write a review
+                            </div>
+                        )}
+
+                        {/* Review list */}
+                        {reviews.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '32px', color: '#999', fontSize: '14px' }}>
+                                No reviews yet. Be the first to review this product!
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {(showAllReviews ? reviews : reviews.slice(0, 3)).map(review => (
+                                    <div key={review.id} style={{
+                                        padding: '20px', borderRadius: '14px', border: '1px solid #f0f0f0',
+                                        background: '#fff',
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                            <div style={{ display: 'flex', gap: '2px' }}>
+                                                {[1, 2, 3, 4, 5].map(s => (
+                                                    <Star key={s} size={14}
+                                                        fill={s <= review.rating ? '#e67e22' : 'none'}
+                                                        stroke="#e67e22" />
+                                                ))}
+                                            </div>
+                                            {review.is_verified && (
+                                                <span style={{
+                                                    fontSize: '11px', fontWeight: 600, color: '#2e7d32',
+                                                    background: '#e8f5e9', padding: '2px 8px', borderRadius: '4px',
+                                                }}>Verified Purchase</span>
+                                            )}
+                                        </div>
+                                        {review.title && (
+                                            <h5 style={{
+                                                fontSize: '15px', fontWeight: 600, color: '#1a1a1a',
+                                                marginBottom: '6px', fontFamily: "'Inter', sans-serif",
+                                            }}>{review.title}</h5>
+                                        )}
+                                        {review.body && (
+                                            <p style={{
+                                                fontSize: '14px', color: '#555', lineHeight: 1.6,
+                                                marginBottom: '10px',
+                                            }}>{review.body}</p>
+                                        )}
+                                        {review.images && review.images.length > 0 && (
+                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', marginBottom: '14px' }}>
+                                                {review.images.map((img, idx) => (
+                                                    <div key={idx} style={{
+                                                        position: 'relative', width: '80px', height: '80px',
+                                                        borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
+                                                    }}>
+                                                        <Image
+                                                            src={img.url}
+                                                            alt={img.altText || `Review Image ${idx + 1}`}
+                                                            fill
+                                                            style={{ objectFit: 'cover' }}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#999' }}>
+                                            <span style={{ fontWeight: 600, color: '#666' }}>{review.user_name}</span>
+                                            <span>•</span>
+                                            <span>{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {reviews.length > 3 && (
+                                    <button
+                                        onClick={() => setShowAllReviews(!showAllReviews)}
+                                        style={{
+                                            alignSelf: 'center',
+                                            padding: '10px 24px',
+                                            background: '#ffffff',
+                                            color: '#1a1a1a',
+                                            border: '2px solid #1a1a1a',
+                                            borderRadius: '10px',
+                                            fontFamily: "'Inter', sans-serif",
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            marginTop: '12px',
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#1a1a1a';
+                                            e.currentTarget.style.color = '#ffffff';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = '#ffffff';
+                                            e.currentTarget.style.color = '#1a1a1a';
+                                        }}
+                                    >
+                                        {showAllReviews ? 'Show Less' : `View All Reviews (${reviews.length})`}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </section>
     );
 }
@@ -1571,6 +1607,7 @@ function RelatedProducts({ products }: { products: ProductDetail[] }) {
                                                 marginBottom: '8px', display: '-webkit-box',
                                                 WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                                                 overflow: 'hidden',
+                                                height: '2.8em',
                                             }}>
                                                 {product.title}
                                             </h3>
