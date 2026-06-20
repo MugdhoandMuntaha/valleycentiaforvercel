@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingBag, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useCart } from '@/lib/CartContext';
 
 export interface TransformationCard {
@@ -355,10 +355,10 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                                                     fontFamily: "'Inter', sans-serif",
                                                     fontSize: '11px',
                                                     fontWeight: 700,
-                                                    color: '#e67e22',
+                                                    color: '#ffb700',
                                                 }}
                                             >
-                                                <Star size={10} fill="#e67e22" stroke="#e67e22" />
+                                                <Star size={10} fill="#ffb700" stroke="#ffb700" />
                                                 {item.rating}
                                             </span>
                                             <span
@@ -403,7 +403,7 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                                                         fontFamily: "'Inter', sans-serif",
                                                         fontSize: '10px',
                                                         fontWeight: 700,
-                                                        color: '#e67e22',
+                                                        color: '#2e7d32',
                                                     }}
                                                 >
                                                     {Math.ceil(item.discountPercent)}% OFF
@@ -449,7 +449,7 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                                             e.currentTarget.style.borderColor = '#e0e0e0';
                                         }}
                                     >
-                                        <ShoppingBag size={16} color="#333" />
+                                        <Plus size={16} color="#333" />
                                     </button>
                                 </div>
                             </Link>

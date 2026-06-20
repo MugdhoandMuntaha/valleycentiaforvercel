@@ -99,6 +99,7 @@ export default function Footer() {
                             alt="ValleyCentia Logo"
                             width={180}
                             height={45}
+                            unoptimized
                             style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
                         />
                     </Link>

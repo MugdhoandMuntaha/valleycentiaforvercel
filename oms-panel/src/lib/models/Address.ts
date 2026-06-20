@@ -10,7 +10,7 @@ export interface IAddress extends Document {
     addressLine2: string | null;
     city: string;
     state: string;
-    postalCode: string;
+    postalCode: string | null;
     country: string;
     landmark: string | null;
     isDefault: boolean;
@@ -28,7 +28,7 @@ const AddressSchema = new Schema<IAddress>(
         addressLine2: { type: String, default: null },
         city: { type: String, required: true },
         state: { type: String, required: true },
-        postalCode: { type: String, required: true },
+        postalCode: { type: String, default: null },
         country: { type: String, default: 'Bangladesh' },
         landmark: { type: String, default: null },
         isDefault: { type: Boolean, default: false },

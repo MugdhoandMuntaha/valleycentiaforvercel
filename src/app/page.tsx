@@ -10,7 +10,7 @@ import type { SectionProduct } from '@/data/homeSections';
 function toSectionProduct(p: SectionProductCard): SectionProduct {
   const badges = p.badges as { badge: string; label: string | null; color: string | null }[] | null;
   const primaryBadge = badges?.find((b) => b.label) || badges?.[0];
-  const badgeText = primaryBadge?.label || primaryBadge?.badge || undefined;
+  const badgeText = primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined;
   const isPremium = badgeText?.toLowerCase() === 'premium';
   return {
     id: p.id,

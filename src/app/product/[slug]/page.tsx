@@ -29,12 +29,15 @@ import {
     Sprout,
     X,
     ZoomIn,
+    MoreVertical,
 } from 'lucide-react';
-import { getProductPageData, getProductReviews, submitReview, type ProductDetail as SupabaseProduct, type ProductCard, type Review } from '@/lib/db/queries';
+import { getProductPageData, getProductReviews, submitReview, deleteReview, updateReview, type ProductDetail as SupabaseProduct, type ProductCard as DBProductCard, type Review } from '@/lib/db/queries';
 import { useCart } from '@/lib/CartContext';
 import { useWishlist } from '@/lib/WishlistContext';
 import { useAuth } from '@/lib/AuthContext';
 import { ProductDetailSkeleton } from '@/components/Skeletons';
+import ProductCard from '@/components/ProductCard';
+import type { SectionProduct } from '@/data/homeSections';
 
 /* ===== Local Display Types (matches existing UI) ===== */
 interface ProductDetail {
@@ -80,7 +83,7 @@ function mapSupabaseToDisplay(p: SupabaseProduct): ProductDetail {
         rating: p.rating_avg || 0,
         reviewCount: String(p.review_count || 0),
         badges: (p.badges && p.badges.length > 0)
-            ? p.badges.map(b => ({ text: b.label || b.badge, color: b.color || null }))
+            ? p.badges.map(b => ({ text: (b.label || b.badge || '').replace(/_/g, ' ').toUpperCase(), color: b.color || null }))
             : [],
         category: p.category_name || 'Products',
         description: p.description || 'No description available.',
@@ -100,7 +103,7 @@ function mapSupabaseToDisplay(p: SupabaseProduct): ProductDetail {
     };
 }
 
-function mapCardToDisplay(p: ProductCard): ProductDetail {
+function mapCardToDisplay(p: DBProductCard): ProductDetail {
     return {
         id: p.id,
         slug: p.slug,
@@ -110,22 +113,22 @@ function mapCardToDisplay(p: ProductCard): ProductDetail {
         price: Math.ceil(p.base_price),
         originalPrice: Math.ceil(p.compare_at_price || p.base_price),
         discountPercent: p.discount_percent || 0,
-        couponPrice: null,
-        couponCode: null,
+        couponPrice: p.coupon_price ? Math.ceil(p.coupon_price) : null,
+        couponCode: p.coupon_code || null,
         rating: p.rating_avg || 0,
         reviewCount: String(p.review_count || 0),
         badges: (p.badges && p.badges.length > 0)
-            ? p.badges.map(b => ({ text: b.label || b.badge, color: b.color || null }))
+            ? p.badges.map(b => ({ text: (b.label || b.badge || '').replace(/_/g, ' ').toUpperCase(), color: b.color || null }))
             : [],
         category: p.category_name || 'Products',
-        description: '',
+        description: p.short_description || '',
         highlights: [],
         howToUse: '',
         ingredients: '',
         keyBenefits: [],
         sizes: [{ label: 'Default', ml: '', price: Math.ceil(p.base_price), active: true }],
         inStock: p.in_stock,
-        stockQuantity: 0,
+        stockQuantity: p.stock_quantity || 0,
     };
 }
 
@@ -163,6 +166,38 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             return {
                 ...prev,
                 reviewCount: String(newCount),
+                rating: newAvg,
+            };
+        });
+    };
+
+    const handleReviewDeleted = (rating: number) => {
+        setProduct(prev => {
+            if (!prev) return null;
+            const currentCount = Number(prev.reviewCount) || 0;
+            const newCount = Math.max(0, currentCount - 1);
+            const currentAvg = prev.rating || 0;
+            let newAvg = 0;
+            if (newCount > 0) {
+                newAvg = Math.round(((currentAvg * currentCount - rating) / newCount) * 10) / 10;
+            }
+            return {
+                ...prev,
+                reviewCount: String(newCount),
+                rating: newAvg,
+            };
+        });
+    };
+
+    const handleReviewUpdated = (oldRating: number, newRating: number) => {
+        setProduct(prev => {
+            if (!prev) return null;
+            const currentCount = Number(prev.reviewCount) || 0;
+            if (currentCount === 0) return prev;
+            const currentAvg = prev.rating || 0;
+            const newAvg = Math.round(((currentAvg * currentCount - oldRating + newRating) / currentCount) * 10) / 10;
+            return {
+                ...prev,
                 rating: newAvg,
             };
         });
@@ -258,14 +293,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
                 </div>
             </section>
 
-            {/* Key Benefits Strip */}
-            <KeyBenefitsStrip benefits={product.keyBenefits} />
-
             {/* Tabbed Content */}
             <TabbedContent product={product} />
 
             {/* Reviews Section */}
-            <ReviewsSection product={product} onReviewSubmitted={handleReviewSubmitted} />
+            <ReviewsSection product={product} onReviewSubmitted={handleReviewSubmitted} onReviewDeleted={handleReviewDeleted} onReviewUpdated={handleReviewUpdated} />
 
             {/* Related Products */}
             {related.length > 0 && <RelatedProducts products={related} />}
@@ -678,8 +710,8 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                     display: 'inline-flex', alignItems: 'center', gap: '3px',
                     background: '#fff8e1', padding: '3px 10px', borderRadius: '6px',
                 }}>
-                    <Star size={13} fill="#e67e22" stroke="#e67e22" />
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#e67e22' }}>{product.rating}</span>
+                    <Star size={13} fill="#ffb700" stroke="#ffb700" />
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffb700' }}>{product.rating}</span>
                 </div>
                 <span style={{ fontSize: '12px', color: '#888' }}>{product.reviewCount} Reviews</span>
                 <span style={{
@@ -719,7 +751,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                                 )}
                                 {discountPct > 0 && (
                                     <span style={{
-                                        fontSize: '12px', fontWeight: 700, color: '#fff', background: '#ef4444',
+                                        fontSize: '12px', fontWeight: 700, color: '#fff', background: '#2e7d32',
                                         padding: '2px 8px', borderRadius: '5px',
                                     }}>
                                         {Math.ceil(discountPct)}% OFF
@@ -747,9 +779,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                         </span>
                     </div>
                 )}
-                <p className="desktop-only" style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-                    Inclusive of all taxes. Free shipping on orders above ৳{freeShippingThreshold}.
-                </p>
+                
             </div>
 
             {/* Size Selector */}
@@ -870,7 +900,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                             onMouseEnter={(e) => { if (!showAdded) { e.currentTarget.style.background = '#e6b800'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
                             onMouseLeave={(e) => { if (!showAdded) { e.currentTarget.style.background = '#f5c518'; e.currentTarget.style.transform = 'translateY(0)'; } }}
                         >
-                            {showAdded ? <Check size={16} /> : <ShoppingBag size={16} />}
+                            {showAdded && <Check size={16} />}
                             {showAdded ? '✓ ADDED TO CART' : 'ADD TO CART'}
                         </button>
 
@@ -960,66 +990,7 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
     );
 }
 
-/* ===== Key Benefits Strip ===== */
-function KeyBenefitsStrip({ benefits }: { benefits: { icon: string; title: string; desc: string }[] }) {
-    return (
-        <section style={{ background: '#f8f8f5', padding: '0', borderTop: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }}>
-            <div className="pdp-benefits-container" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 48px' }}>
-                <div style={{
-                    display: 'grid', gridTemplateColumns: `repeat(${benefits.length}, 1fr)`, gap: '24px',
-                }} className="benefits-grid">
-                    {benefits.map((b, i) => {
-                        const IconComp = iconMap[b.icon] || Shield;
-                        return (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: i * 0.1, duration: 0.5 }}
-                                style={{
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                    textAlign: 'center', padding: '24px 16px',
-                                    background: '#ffffff', borderRadius: '16px',
-                                    border: '1px solid #f0f0f0', transition: 'all 0.3s',
-                                }}
-                                onMouseEnter={(e) => {
-                                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.06)';
-                                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-                                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-                                }}
-                            >
-                                <div style={{
-                                    width: '52px', height: '52px', borderRadius: '14px',
-                                    background: 'linear-gradient(135deg, #e8f5e9, #f1f8e9)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    marginBottom: '14px',
-                                }}>
-                                    <IconComp size={24} style={{ color: '#2e7d32' }} />
-                                </div>
-                                <span style={{
-                                    fontFamily: "'Inter', sans-serif", fontSize: '14px',
-                                    fontWeight: 700, color: '#1a1a1a', marginBottom: '4px',
-                                }}>
-                                    {b.title}
-                                </span>
-                                <span style={{
-                                    fontFamily: "'Inter', sans-serif", fontSize: '12px', color: '#888',
-                                    wordBreak: 'break-word', overflowWrap: 'anywhere',
-                                }}>
-                                    {b.desc}
-                                </span>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-            </div>
-        </section>
-    );
-}
+
 
 /* ===== Tabbed Content ===== */
 function TabbedContent({ product }: { product: ProductDetail }) {
@@ -1088,7 +1059,17 @@ function TabbedContent({ product }: { product: ProductDetail }) {
 }
 
 /* ===== Reviews Section ===== */
-function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail; onReviewSubmitted: (rating: number) => void }) {
+function ReviewsSection({
+    product,
+    onReviewSubmitted,
+    onReviewDeleted,
+    onReviewUpdated,
+}: {
+    product: ProductDetail;
+    onReviewSubmitted: (rating: number) => void;
+    onReviewDeleted: (rating: number) => void;
+    onReviewUpdated: (oldRating: number, newRating: number) => void;
+}) {
     const [reviews, setReviews] = useState<Review[]>([]);
     const [reviewLoading, setReviewLoading] = useState(true);
     const { user } = useAuth();
@@ -1099,6 +1080,45 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
     const [uploadedImages, setUploadedImages] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+
+    // Edit/delete state hooks
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState({ rating: 5, title: '', body: '' });
+    const [updatingReview, setUpdatingReview] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
+    const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+
+    // Image Zoom modal state
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+    // 3-dot menu active review ID
+    const [activeMenuReviewId, setActiveMenuReviewId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target) return;
+            if (!document.body.contains(target)) {
+                return;
+            }
+            if (target.closest && (target.closest('.review-menu-btn') || target.closest('.review-menu-dropdown'))) {
+                return;
+            }
+            setActiveMenuReviewId(null);
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setZoomedImage(null);
+        };
+        if (zoomedImage) {
+            window.addEventListener('keydown', handleKeyDown);
+        }
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [zoomedImage]);
 
     useEffect(() => {
         let active = true;
@@ -1142,7 +1162,7 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
         if (!user?.id || reviewForm.rating < 1) return;
         setSubmitting(true);
         setSubmitError(null);
-        const { error } = await submitReview({
+        const { error, reviewId } = await submitReview({
             product_id: product.id,
             user_id: user.id,
             rating: reviewForm.rating,
@@ -1158,7 +1178,7 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
         if (!error) {
             setSubmitted(true);
             const newReview: Review = {
-                id: 'temp-' + Date.now(),
+                id: reviewId || 'temp-' + Date.now(),
                 product_id: product.id,
                 user_id: user.id,
                 rating: reviewForm.rating,
@@ -1187,6 +1207,75 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
         }
     };
 
+    const handleDeleteReview = async (review: Review) => {
+        if (!user?.id) return;
+        if (!window.confirm('Are you sure you want to delete this review?')) return;
+
+        setDeletingReviewId(review.id);
+        const { error } = await deleteReview({
+            reviewId: review.id,
+            userId: user.id
+        });
+        setDeletingReviewId(null);
+
+        if (!error) {
+            setReviews(prev => prev.filter(r => r.id !== review.id));
+            onReviewDeleted(review.rating);
+        } else {
+            alert(error || 'Failed to delete review');
+        }
+    };
+
+    const startEditing = (review: Review) => {
+        setEditingReviewId(review.id);
+        setEditForm({
+            rating: review.rating,
+            title: review.title || '',
+            body: review.body || ''
+        });
+        setEditError(null);
+    };
+
+    const handleSaveEdit = async (reviewId: string, oldRating: number) => {
+        if (!user?.id) return;
+        if (editForm.rating < 1) {
+            setEditError('Rating must be at least 1 star');
+            return;
+        }
+
+        setUpdatingReview(true);
+        setEditError(null);
+
+        const { error } = await updateReview({
+            reviewId,
+            userId: user.id,
+            rating: editForm.rating,
+            title: editForm.title,
+            body: editForm.body
+        });
+
+        setUpdatingReview(false);
+
+        if (!error) {
+            setReviews(prev => prev.map(r => {
+                if (r.id === reviewId) {
+                    return {
+                        ...r,
+                        rating: editForm.rating,
+                        title: editForm.title || null,
+                        body: editForm.body || null,
+                        created_at: new Date().toISOString()
+                    };
+                }
+                return r;
+            }));
+            setEditingReviewId(null);
+            onReviewUpdated(oldRating, editForm.rating);
+        } else {
+            setEditError(error || 'Failed to update review');
+        }
+    };
+
     const ratingDist = [5, 4, 3, 2, 1].map(star => {
         const count = reviews.filter(r => r.rating === star).length;
         return { star, count, pct: reviews.length > 0 ? (count / reviews.length) * 100 : 0 };
@@ -1212,14 +1301,14 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
                         border: '1px solid #f0f0f0',
                     }}>
                         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                            <div style={{ fontSize: '48px', fontWeight: 800, color: '#1a1a1a', lineHeight: 1 }}>
+                            <div style={{ fontSize: '48px', fontWeight: 600, color: '#1a1a1a', lineHeight: 1 }}>
                                 {product.rating}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', margin: '8px 0' }}>
                                 {[1, 2, 3, 4, 5].map(s => (
                                     <Star key={s} size={18}
-                                        fill={s <= Math.round(product.rating) ? '#e67e22' : 'none'}
-                                        stroke="#e67e22" />
+                                        fill={s <= Math.round(product.rating) ? '#ffb700ff' : 'none'}
+                                        stroke="#ffb700ff" />
                                 ))}
                             </div>
                             <div style={{ fontSize: '13px', color: '#888' }}>
@@ -1231,13 +1320,13 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
                             {ratingDist.map(rd => (
                                 <div key={rd.star} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ fontSize: '13px', fontWeight: 600, color: '#555', width: '14px' }}>{rd.star}</span>
-                                    <Star size={12} fill="#e67e22" stroke="#e67e22" />
+                                    <Star size={12} fill="#ffb700ff" stroke="#ffb700ff" />
                                     <div style={{
                                         flex: 1, height: '8px', background: '#eee', borderRadius: '4px', overflow: 'hidden',
                                     }}>
                                         <div style={{
                                             width: `${rd.pct}%`, height: '100%',
-                                            background: '#e67e22', borderRadius: '4px',
+                                            background: '#ffb700ff', borderRadius: '4px',
                                             transition: 'width 0.5s ease',
                                         }} />
                                     </div>
@@ -1390,55 +1479,189 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
                                     <div key={review.id} style={{
                                         padding: '20px', borderRadius: '14px', border: '1px solid #f0f0f0',
                                         background: '#fff',
+                                        position: 'relative',
                                     }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                                            <div style={{ display: 'flex', gap: '2px' }}>
-                                                {[1, 2, 3, 4, 5].map(s => (
-                                                    <Star key={s} size={14}
-                                                        fill={s <= review.rating ? '#e67e22' : 'none'}
-                                                        stroke="#e67e22" />
-                                                ))}
-                                            </div>
-                                            {review.is_verified && (
-                                                <span style={{
-                                                    fontSize: '11px', fontWeight: 600, color: '#2e7d32',
-                                                    background: '#e8f5e9', padding: '2px 8px', borderRadius: '4px',
-                                                }}>Verified Purchase</span>
-                                            )}
-                                        </div>
-                                        {review.title && (
-                                            <h5 style={{
-                                                fontSize: '15px', fontWeight: 600, color: '#1a1a1a',
-                                                marginBottom: '6px', fontFamily: "'Inter', sans-serif",
-                                            }}>{review.title}</h5>
-                                        )}
-                                        {review.body && (
-                                            <p style={{
-                                                fontSize: '14px', color: '#555', lineHeight: 1.6,
-                                                marginBottom: '10px',
-                                            }}>{review.body}</p>
-                                        )}
-                                        {review.images && review.images.length > 0 && (
-                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', marginBottom: '14px' }}>
-                                                {review.images.map((img, idx) => (
-                                                    <div key={idx} style={{
-                                                        position: 'relative', width: '80px', height: '80px',
-                                                        borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
+                                        {/* 3-dot action menu for review owner */}
+                                        {user?.id === review.user_id && editingReviewId !== review.id && (
+                                            <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+                                                <button
+                                                    className="review-menu-btn"
+                                                    onClick={(e) => { e.stopPropagation(); setActiveMenuReviewId(prev => prev === review.id ? null : review.id); }}
+                                                    style={{
+                                                        background: 'none', border: 'none', color: '#999',
+                                                        cursor: 'pointer', padding: '4px', borderRadius: '50%',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                >
+                                                    <MoreVertical size={18} />
+                                                </button>
+                                                {activeMenuReviewId === review.id && (
+                                                    <div className="review-menu-dropdown" style={{
+                                                        position: 'absolute', right: 0, top: '28px',
+                                                        background: 'white', border: '1px solid #e0e0e0',
+                                                        borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                        padding: '6px 0', zIndex: 10, minWidth: '100px',
                                                     }}>
-                                                        <Image
-                                                            src={img.url}
-                                                            alt={img.altText || `Review Image ${idx + 1}`}
-                                                            fill
-                                                            style={{ objectFit: 'cover' }}
-                                                        />
+                                                        <button
+                                                            onClick={() => { setActiveMenuReviewId(null); startEditing(review); }}
+                                                            style={{
+                                                                width: '100%', padding: '8px 16px', border: 'none',
+                                                                background: 'none', color: '#1a1a1a', textAlign: 'left',
+                                                                fontSize: '13px', cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setActiveMenuReviewId(null); handleDeleteReview(review); }}
+                                                            style={{
+                                                                width: '100%', padding: '8px 16px', border: 'none',
+                                                                background: 'none', color: '#cc0000', textAlign: 'left',
+                                                                fontSize: '13px', cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+                                                                fontWeight: 500,
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.background = '#fff0f0'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                        >
+                                                            Delete
+                                                        </button>
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#999' }}>
-                                            <span style={{ fontWeight: 600, color: '#666' }}>{review.user_name}</span>
-                                            <span>•</span>
-                                            <span>{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+
+                                        {editingReviewId !== review.id && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '2px' }}>
+                                                    {[1, 2, 3, 4, 5].map(s => (
+                                                        <Star key={s} size={14}
+                                                            fill={s <= review.rating ? '#ffb700' : 'none'}
+                                                            stroke="#ffb700" />
+                                                    ))}
+                                                </div>
+                                                {review.is_verified && (
+                                                    <span style={{
+                                                        fontSize: '11px', fontWeight: 600, color: '#2e7d32',
+                                                        background: '#e8f5e9', padding: '2px 8px', borderRadius: '4px',
+                                                    }}>Verified Purchase</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {editingReviewId === review.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', marginBottom: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                                                    {[1, 2, 3, 4, 5].map(s => (
+                                                        <button
+                                                            key={s}
+                                                            type="button"
+                                                            onClick={() => setEditForm(p => ({ ...p, rating: s }))}
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                        >
+                                                            <Star size={18}
+                                                                fill={s <= editForm.rating ? '#ffb700' : 'none'}
+                                                                stroke="#ffb700" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <input
+                                                    placeholder="Review title"
+                                                    value={editForm.title}
+                                                    onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))}
+                                                    style={{
+                                                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                                                        border: '1px solid #e0e0e0', fontSize: '13px',
+                                                        fontFamily: "'Inter', sans-serif", outline: 'none', color: 'black'
+                                                    }}
+                                                />
+                                                <textarea
+                                                    placeholder="Write your review here..."
+                                                    value={editForm.body}
+                                                    onChange={e => setEditForm(p => ({ ...p, body: e.target.value }))}
+                                                    rows={3}
+                                                    style={{
+                                                        width: '100%', padding: '8px 12px', borderRadius: '8px',
+                                                        border: '1px solid #e0e0e0', fontSize: '13px',
+                                                        fontFamily: "'Inter', sans-serif", resize: 'none', outline: 'none', color: 'black'
+                                                    }}
+                                                />
+                                                {editError && (
+                                                    <div style={{ color: '#d32f2f', fontSize: '12px' }}>{editError}</div>
+                                                )}
+                                                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                                    <button
+                                                        onClick={() => handleSaveEdit(review.id, review.rating)}
+                                                        disabled={updatingReview}
+                                                        style={{
+                                                            padding: '6px 16px', background: '#1a1a1a', color: '#fff',
+                                                            border: 'none', borderRadius: '8px', fontSize: '12px',
+                                                            fontWeight: 600, cursor: updatingReview ? 'not-allowed' : 'pointer',
+                                                            opacity: updatingReview ? 0.6 : 1,
+                                                        }}
+                                                    >
+                                                        {updatingReview ? 'Saving...' : 'Save'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingReviewId(null)}
+                                                        disabled={updatingReview}
+                                                        style={{
+                                                            padding: '6px 16px', background: '#f5f5f5', color: '#333',
+                                                            border: '1px solid #ddd', borderRadius: '8px', fontSize: '12px',
+                                                            fontWeight: 600, cursor: updatingReview ? 'not-allowed' : 'pointer',
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {review.title && (
+                                                    <h5 style={{
+                                                        fontSize: '15px', fontWeight: 600, color: '#1a1a1a',
+                                                        marginBottom: '6px', fontFamily: "'Inter', sans-serif",
+                                                    }}>{review.title}</h5>
+                                                )}
+                                                {review.body && (
+                                                    <p style={{
+                                                        fontSize: '14px', color: '#555', lineHeight: 1.6,
+                                                        marginBottom: '10px',
+                                                    }}>{review.body}</p>
+                                                )}
+                                                {review.images && review.images.length > 0 && (
+                                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', marginBottom: '14px' }}>
+                                                        {review.images.map((img, idx) => (
+                                                            <div key={idx}
+                                                                onClick={() => setZoomedImage(img.url)}
+                                                                style={{
+                                                                    position: 'relative', width: '80px', height: '80px',
+                                                                    borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <Image
+                                                                    src={img.url}
+                                                                    alt={img.altText || `Review Image ${idx + 1}`}
+                                                                    fill
+                                                                    style={{ objectFit: 'cover' }}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '12px', color: '#999' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontWeight: 600, color: '#666' }}>{review.user_name}</span>
+                                                <span>•</span>
+                                                <span>{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -1477,37 +1700,122 @@ function ReviewsSection({ product, onReviewSubmitted }: { product: ProductDetail
                     </div>
                 </div>
             )}
+
+            {/* Image Zoom Modal */}
+            <AnimatePresence>
+                {zoomedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setZoomedImage(null)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100vw',
+                            height: '100vh',
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            backdropFilter: 'blur(8px)',
+                            zIndex: 2000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'zoom-out',
+                        }}
+                    >
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+                            style={{
+                                position: 'absolute',
+                                top: '24px',
+                                right: '24px',
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                border: 'none',
+                                color: 'white',
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        >
+                            <X size={20} />
+                        </button>
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                position: 'relative',
+                                maxWidth: '85vw',
+                                maxHeight: '85vh',
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                cursor: 'default',
+                            }}
+                        >
+                            <img
+                                src={zoomedImage}
+                                alt="Zoomed Review"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '85vh',
+                                    objectFit: 'contain',
+                                    display: 'block',
+                                }}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </section>
     );
 }
 
 /* ===== Related Products ===== */
-function RelatedProducts({ products }: { products: ProductDetail[] }) {
-    const { addToCart } = useCart();
-    const [addedId, setAddedId] = useState<string | null>(null);
+function toSectionProductFromDetail(p: ProductDetail): SectionProduct {
+    const primaryBadge = p.badges?.[0];
+    const badgeText = primaryBadge?.text;
+    const isPremium = badgeText?.toLowerCase() === 'premium';
 
-    useEffect(() => {
-        if (addedId !== null) {
-            const timer = setTimeout(() => setAddedId(null), 1500);
-            return () => clearTimeout(timer);
-        }
-    }, [addedId]);
-
-    const handleAdd = (product: ProductDetail) => {
-        if (!product.inStock) return;
-        const defaultSize = product.sizes.find((s) => s.active) || product.sizes[0];
-        addToCart({
-            id: String(product.id),
-            slug: product.slug,
-            name: product.title,
-            image: product.images[0],
-            price: defaultSize.price,
-            originalPrice: product.originalPrice,
-            size: defaultSize.label,
-        });
-        setAddedId(product.id);
+    return {
+        id: p.id,
+        slug: p.slug,
+        image: p.images?.[0] || '/no-image.svg',
+        title: p.title,
+        description: p.description || '',
+        price: p.price,
+        originalPrice: p.originalPrice,
+        discountPercent: p.discountPercent,
+        rating: p.rating,
+        reviewCount: p.reviewCount,
+        badge: badgeText,
+        badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
+        inStock: p.inStock,
+        stockQuantity: p.stockQuantity,
+        sizes: p.sizes ? p.sizes.map((sz, idx) => ({
+            id: `${p.id}-${sz.label}-${idx}`,
+            label: sz.label,
+            ml: sz.ml || null,
+            price: sz.price,
+            is_default: !!sz.active,
+            stockQuantity: sz.stockQuantity,
+        })) : null,
+        couponCode: p.couponCode || undefined,
+        couponPrice: p.couponPrice || undefined,
     };
+}
 
+function RelatedProducts({ products }: { products: ProductDetail[] }) {
     return (
         <section className="pdp-related-section" style={{ background: '#ffffff', padding: '56px 0 72px' }}>
             <div className="pdp-related-container" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 48px' }}>
@@ -1515,7 +1823,7 @@ function RelatedProducts({ products }: { products: ProductDetail[] }) {
                     fontFamily: "'Outfit', sans-serif", fontSize: '26px', fontWeight: 700,
                     color: '#1a1a1a', marginBottom: '8px',
                 }}>
-                    Complete your Basket
+                    People also like
                 </h2>
                 <p style={{
                     fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#888',
@@ -1527,148 +1835,14 @@ function RelatedProducts({ products }: { products: ProductDetail[] }) {
                 <div style={{
                     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px',
                 }} className="products-grid">
-                    {products.map((product, i) => {
-                        const isAdded = addedId === product.id;
-                        return (
-                            <motion.div
-                                key={product.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: i * 0.08, duration: 0.5 }}
-                            >
-                                <div style={{
-                                    background: '#fff', borderRadius: '14px', overflow: 'hidden',
-                                    border: '1px solid #f0f0f0', transition: 'all 0.3s',
-                                    cursor: 'pointer',
-                                }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
-                                        e.currentTarget.style.transform = 'translateY(-4px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.boxShadow = 'none';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    <Link href={`/product/${product.slug}`} style={{ textDecoration: 'none' }}>
-                                        {/* Image */}
-                                        <div style={{
-                                            position: 'relative', width: '100%', height: '220px',
-                                            background: '#f8f6f3', overflow: 'hidden',
-                                        }}>
-                                            <Image
-                                                src={product.images[0]}
-                                                alt={product.title}
-                                                fill
-                                                sizes="25vw"
-                                                style={{ objectFit: 'cover', transition: 'transform 0.5s' }}
-                                                className="product-image"
-                                            />
-                                            {product.badges.length > 0 && (() => {
-                                                const bg = product.badges[0].color || '#f0c14b';
-                                                const light = isLightColor(bg);
-                                                return (
-                                                    <span style={{
-                                                        position: 'absolute',
-                                                        background: bg,
-                                                        color: light ? '#1a1a1a' : '#ffffff',
-                                                        fontSize: '11px', fontWeight: 600, padding: '5px 12px',
-                                                        borderRadius: '4px',
-                                                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-                                                        letterSpacing: '0.5px',
-                                                        textTransform: 'uppercase',
-                                                    }}>
-                                                        {product.badges[0].text}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </div>
-
-                                        {/* Content */}
-                                        <div style={{ padding: '14px 14px 8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                                                <span style={{
-                                                    display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                                    background: '#fff8e1', padding: '3px 8px', borderRadius: '4px',
-                                                    fontSize: '12px', fontWeight: 700, color: '#e67e22',
-                                                    fontFamily: "'Inter', sans-serif",
-                                                }}>
-                                                    <Star size={12} fill="#e67e22" stroke="#e67e22" />
-                                                    {product.rating}
-                                                </span>
-                                                <span style={{ fontSize: '12px', color: '#999', fontFamily: "'Inter', sans-serif" }}>
-                                                    | {product.reviewCount} Reviews
-                                                </span>
-                                            </div>
-                                            <h3 style={{
-                                                fontFamily: "'Inter', sans-serif", fontSize: '13px',
-                                                fontWeight: 600, color: '#1a1a1a', lineHeight: 1.4,
-                                                marginBottom: '8px', display: '-webkit-box',
-                                                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                                                overflow: 'hidden',
-                                                height: '2.8em',
-                                            }}>
-                                                {product.title}
-                                            </h3>
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                                <span style={{ fontSize: '20px', fontWeight: 700, color: '#1a1a1a', fontFamily: "'Inter', sans-serif", lineHeight: 1 }}>
-                                                    ৳{product.price}
-                                                </span>
-                                                {product.originalPrice > product.price && (
-                                                    <span style={{ fontSize: '14px', color: '#bbb', textDecoration: 'line-through', fontFamily: "'Inter', sans-serif", lineHeight: 1 }}>
-                                                        ৳{product.originalPrice}
-                                                    </span>
-                                                )}
-                                                {product.discountPercent > 0 && (
-                                                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#e67e22', fontFamily: "'Inter', sans-serif" }}>
-                                                        {Math.ceil(product.discountPercent)}% OFF
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </Link>
-                                    {/* Add to Cart button */}
-                                    <div style={{ padding: '0 14px 14px' }}>
-                                        {product.inStock ? (
-                                            <button
-                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAdd(product); }}
-                                                style={{
-                                                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                                    background: isAdded ? '#2e7d32' : '#f5c518',
-                                                    color: isAdded ? '#fff' : '#1a1a1a',
-                                                    border: 'none', borderRadius: '8px', padding: '10px 0',
-                                                    fontSize: '13px', fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                                                    cursor: 'pointer', transition: 'all 0.3s ease', letterSpacing: '0.5px',
-                                                    marginTop: '6px',
-                                                }}
-                                                onMouseEnter={(e) => { if (!isAdded) e.currentTarget.style.background = '#e6b800'; }}
-                                                onMouseLeave={(e) => { if (!isAdded) e.currentTarget.style.background = '#f5c518'; }}
-                                            >
-                                                {isAdded ? <Check size={14} /> : <ShoppingBag size={14} />}
-                                                {isAdded ? '✓ ADDED' : 'ADD TO CART'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                disabled
-                                                style={{
-                                                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                                    background: '#e0e0e0',
-                                                    color: '#888',
-                                                    border: 'none', borderRadius: '8px', padding: '10px 0',
-                                                    fontSize: '13px', fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                                                    cursor: 'not-allowed',
-                                                    marginTop: '6px',
-                                                }}
-                                            >
-                                                OUT OF STOCK
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
+                    {products.map((product, i) => (
+                        <ProductCard
+                            key={product.id}
+                            product={toSectionProductFromDetail(product)}
+                            index={i}
+                            isCarousel={false}
+                        />
+                    ))}
                 </div>
             </div>
         </section>

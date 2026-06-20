@@ -4,11 +4,12 @@ import React, { useMemo, useState, useEffect, useCallback, Suspense } from 'reac
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingBag, Star, ArrowLeft, Filter } from 'lucide-react';
+import { Star, ArrowLeft, Filter, Check } from 'lucide-react';
 import { useCart } from '@/lib/CartContext';
 import { getProductCards } from '@/lib/db/queries';
-import type { ProductCard } from '@/lib/db/queries';
+import type { ProductCard as DbProductCard } from '@/lib/db/queries';
 import type { SectionProduct } from '@/data/homeSections';
+import ProductCard from '@/components/ProductCard';
 
 /* ─── Extended product with filterable tags ─── */
 interface TaggedProduct extends SectionProduct {
@@ -18,10 +19,10 @@ interface TaggedProduct extends SectionProduct {
 }
 
 /** Convert a Supabase ProductCard into a TaggedProduct */
-function supabaseToTagged(p: ProductCard): TaggedProduct {
+function supabaseToTagged(p: DbProductCard): TaggedProduct {
     const badges = p.badges as { badge: string; label: string | null; color: string | null }[] | null;
     const primaryBadge = badges?.find((b) => b.label) || badges?.[0];
-    const badgeText = primaryBadge?.label || primaryBadge?.badge || undefined;
+    const badgeText = primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined;
     const isPremium = badgeText?.toLowerCase() === 'premium';
     const formatReviewCount = (count: number) => count >= 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
 
@@ -42,6 +43,8 @@ function supabaseToTagged(p: ProductCard): TaggedProduct {
         productType: p.category_slug || 'other',
         concerns: p.concerns || [],
         inStock: p.in_stock !== undefined ? p.in_stock : true,
+        couponCode: p.coupon_code || undefined,
+        couponPrice: p.coupon_price ? Math.ceil(Number(p.coupon_price)) : undefined,
     };
 }
 
@@ -643,305 +646,12 @@ function ShopContent() {
                         }}
                     >
                         {products.map((product, index) => (
-                            <Link
+                            <ProductCard
                                 key={`${product.id}-${index}`}
-                                href={`/product/${product.slug}`}
-                                style={{
-                                    height: '532px',
-                                    background: '#ffffff',
-                                    borderRadius: '12px',
-                                    border: '1px solid #f0f0f0',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    transition: 'box-shadow 0.2s ease, transform 0.2s ease',
-                                    cursor: 'pointer',
-                                    textDecoration: 'none',
-                                    color: 'inherit',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.boxShadow = 'none';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                            >
-                                {/* ── Image Area ── */}
-                                <div
-                                    className="shop-card-image-area"
-                                    style={{
-                                        position: 'relative',
-                                        width: '100%',
-                                        height: '50%',
-                                        background: '#f8f6f3',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    <Image
-                                        src={product.image}
-                                        alt={product.title}
-                                        fill
-                                        sizes="25vw"
-                                        style={{ objectFit: 'cover' }}
-                                    />
-                                    {product.badge && (() => {
-                                        const bg = product.badgeColor || '#f0c14b';
-                                        const ch = bg.replace('#', '');
-                                        const isLight = ch.length >= 6 && (0.299 * parseInt(ch.substring(0, 2), 16) + 0.587 * parseInt(ch.substring(2, 4), 16) + 0.114 * parseInt(ch.substring(4, 6), 16)) / 255 > 0.55;
-                                        return (
-                                            <span
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '12px',
-                                                    left: '12px',
-                                                    background: bg,
-                                                    color: isLight ? '#1a1a1a' : '#ffffff',
-                                                    fontFamily: "'Inter', sans-serif",
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    padding: '5px 12px',
-                                                    borderRadius: '4px',
-                                                    zIndex: 2,
-                                                    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-                                                    letterSpacing: '0.5px',
-                                                    textTransform: 'uppercase',
-                                                }}
-                                            >
-                                                {product.badge}
-                                            </span>
-                                        );
-                                    })()}
-                                    {product.extraBadge && (
-                                        <span
-                                            style={{
-                                                position: 'absolute',
-                                                top: '12px',
-                                                right: '12px',
-                                                background:
-                                                    product.badgeColor === '#2e7d32'
-                                                        ? '#e91e63'
-                                                        : 'rgba(46,125,50,0.9)',
-                                                color: '#ffffff',
-                                                fontFamily: "'Outfit', sans-serif",
-                                                fontSize: '10px',
-                                                fontWeight: 700,
-                                                padding: '6px',
-                                                borderRadius: '50%',
-                                                width: '52px',
-                                                height: '52px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                textAlign: 'center',
-                                                lineHeight: 1.15,
-                                                zIndex: 2,
-                                                whiteSpace: 'pre-line',
-                                            }}
-                                        >
-                                            {product.extraBadge}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* ── Card Content ── */}
-                                <div
-                                    style={{
-                                        padding: '14px 14px 16px',
-                                        flex: 1,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                    }}
-                                >
-                                    {/* Rating */}
-                                    <div
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            marginBottom: '8px',
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '3px',
-                                                background: '#fff8e1',
-                                                padding: '3px 8px',
-                                                borderRadius: '4px',
-                                                fontFamily: "'Inter', sans-serif",
-                                                fontSize: '12px',
-                                                fontWeight: 700,
-                                                color: '#e67e22',
-                                            }}
-                                        >
-                                            <Star size={12} fill="#e67e22" stroke="#e67e22" />
-                                            {product.rating}
-                                        </span>
-                                        <span
-                                            style={{
-                                                fontFamily: "'Inter', sans-serif",
-                                                fontSize: '12px',
-                                                color: '#999',
-                                            }}
-                                        >
-                                            | {product.reviewCount} Reviews
-                                        </span>
-                                    </div>
-
-                                    {/* Title */}
-                                    <h3
-                                        style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '16px',
-                                            fontWeight: 700,
-                                            color: '#1a1a1a',
-                                            lineHeight: 1.4,
-                                            marginBottom: '4px',
-                                            display: '-webkit-box',
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: 'vertical',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                        }}
-                                    >
-                                        {product.title}
-                                    </h3>
-
-                                    {/* Description */}
-                                    <p
-                                        style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '13px',
-                                            color: '#888',
-                                            lineHeight: 1.4,
-                                            marginBottom: '12px',
-                                            display: '-webkit-box',
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: 'vertical',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                        }}
-                                    >
-                                        {product.description}
-                                    </p>
-
-                                    {/* Price Row */}
-                                    <div style={{ marginTop: 'auto' }}>
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '4px',
-                                                marginBottom: '8px',
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    fontFamily: "'Inter', sans-serif",
-                                                    fontSize: '20px',
-                                                    fontWeight: 700,
-                                                    color: '#1a1a1a',
-                                                    lineHeight: 1,
-                                                }}
-                                            >
-                                                ৳{product.price}
-                                            </span>
-                                            {((product.originalPrice != null && product.originalPrice > 0) || (product.discountPercent != null && product.discountPercent > 0)) && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {product.originalPrice != null && product.originalPrice > 0 && (
-                                                        <span
-                                                            style={{
-                                                                fontFamily: "'Inter', sans-serif",
-                                                                fontSize: '14px',
-                                                                color: '#bbb',
-                                                                textDecoration: 'line-through',
-                                                                lineHeight: 1,
-                                                            }}
-                                                        >
-                                                            ৳{product.originalPrice}
-                                                        </span>
-                                                    )}
-                                                    {product.discountPercent != null && product.discountPercent > 0 && (
-                                                        <span
-                                                            style={{
-                                                                fontFamily: "'Inter', sans-serif",
-                                                                fontSize: '12px',
-                                                                fontWeight: 600,
-                                                                color: '#e67e22',
-                                                            }}
-                                                        >
-                                                            {Math.ceil(product.discountPercent)}% OFF
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-
-
-                                        {/* Add to Cart */}
-                                        <button
-                                            disabled={product.inStock === false}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                if (product.inStock === false) return;
-                                                addToCart({
-                                                    id: String(product.id),
-                                                    slug: product.slug,
-                                                    name: product.title,
-                                                    image: product.image,
-                                                    price: product.price,
-                                                    originalPrice: product.originalPrice,
-                                                });
-                                            }}
-                                            style={{
-                                                width: '100%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '8px',
-                                                background: product.inStock === false ? '#e0e0e0' : '#f5c518',
-                                                color: product.inStock === false ? '#888' : '#1a1a1a',
-                                                border: 'none',
-                                                borderRadius: '8px',
-                                                padding: '11px 0',
-                                                fontFamily: "'Inter', sans-serif",
-                                                fontSize: '13px',
-                                                fontWeight: 700,
-                                                letterSpacing: '0.5px',
-                                                cursor: product.inStock === false ? 'not-allowed' : 'pointer',
-                                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                textTransform: 'uppercase',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (product.inStock === false) return;
-                                                e.currentTarget.style.background = '#e6b800';
-                                                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(245, 197, 24, 0.4)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (product.inStock === false) return;
-                                                e.currentTarget.style.background = '#f5c518';
-                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                                e.currentTarget.style.boxShadow = 'none';
-                                            }}
-                                        >
-                                            {product.inStock === false ? (
-                                                'OUT OF STOCK'
-                                            ) : (
-                                                <>
-                                                    <ShoppingBag size={15} />
-                                                    ADD TO CART
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            </Link>
+                                product={product}
+                                index={index}
+                                isCarousel={false}
+                            />
                         ))}
                     </div>
                 )}

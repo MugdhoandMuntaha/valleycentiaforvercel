@@ -49,7 +49,7 @@ export default async function TermsPage() {
                         color: '#ffffff',
                         marginBottom: '12px',
                     }}>
-                        Terms of Service
+                        Terms and Conditions
                     </h1>
                 </div>
             </section>

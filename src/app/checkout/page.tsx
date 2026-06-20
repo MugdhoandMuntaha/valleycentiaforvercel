@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ArrowLeft, MapPin, CreditCard, Loader2, Plus, Shield, Truck, Package,
+    ArrowLeft, MapPin, CreditCard, Loader2, Plus, Minus, Shield, Truck, Package,
     Home, Briefcase, Check, X, Lock, Wallet, Edit3, Trash2, Save, Tag, ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
@@ -40,6 +40,7 @@ export default function CheckoutPage() {
     const [guestEmail, setGuestEmail] = useState('');
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [detectingLocation, setDetectingLocation] = useState(false);
+    const [shakeTerms, setShakeTerms] = useState(false);
 
     const handleDetectLocation = () => {
         if (typeof window !== 'undefined' && !window.isSecureContext) {
@@ -254,10 +255,16 @@ export default function CheckoutPage() {
         }
     }, [user, loadAddresses]);
 
+    useEffect(() => {
+        if (user && user.email) {
+            setGuestEmail(user.email);
+        }
+    }, [user]);
+
     const handleAddrSave = async () => {
         if (!user) return;
         const state = addrForm.state?.trim() || '';
-        const postal_code = addrForm.postal_code?.trim() || '1000';
+        const postal_code = addrForm.postal_code?.trim() || '';
         const country = addrForm.country?.trim() || 'Bangladesh';
         const label = addrForm.label?.trim() || 'Home';
 
@@ -310,23 +317,20 @@ export default function CheckoutPage() {
 
     const handlePay = async () => {
         if (!user && !agreedToTerms) {
-            setError('You must agree to the Terms of Service and Privacy Policy to place your order.');
+            setError('');
+            setShakeTerms(true);
+            setTimeout(() => setShakeTerms(false), 500);
             return;
         }
         
-        let email = '';
-        if (user) {
-            email = user.email || '';
-        } else {
-            if (guestEmail && !guestEmail.includes('@')) {
-                setError('Please enter a valid email address');
-                return;
-            }
-            email = guestEmail || 'guest@valleycentia.com';
+        if (guestEmail && !guestEmail.includes('@')) {
+            setError('Please enter a valid email address');
+            return;
         }
+        let email = guestEmail || (user ? user.email : '') || 'guest@valleycentia.com';
 
         const state = addrForm.state?.trim() || '';
-        const postal_code = addrForm.postal_code?.trim() || '1000';
+        const postal_code = addrForm.postal_code?.trim() || '';
         const country = addrForm.country?.trim() || 'Bangladesh';
         const label = addrForm.label?.trim() || 'Home';
 
@@ -566,21 +570,6 @@ export default function CheckoutPage() {
                                         )}
                                     </button>
 
-                                    {/* Email Address for Guest Users */}
-                                    {!user && (
-                                        <div className="co-form-field">
-                                            <label className="co-label">Email Address *</label>
-                                            <input
-                                                type="email"
-                                                value={guestEmail}
-                                                onChange={e => setGuestEmail(e.target.value)}
-                                                placeholder="you@example.com"
-                                                className="co-input"
-                                                required
-                                            />
-                                        </div>
-                                    )}
-
                                     {/* Form Fields */}
                                     <div className="co-form-field">
                                         <label className="co-label">Full Name *</label>
@@ -589,6 +578,18 @@ export default function CheckoutPage() {
                                     <div className="co-form-field">
                                         <label className="co-label">Phone Number *</label>
                                         <input value={addrForm.phone} onChange={e => setAddrForm(p => ({ ...p, phone: e.target.value }))} className="co-input" placeholder="017XXXXXXXX" required />
+                                    </div>
+
+                                    {/* Email Address */}
+                                    <div className="co-form-field">
+                                        <label className="co-label">Email Address (Optional)</label>
+                                        <input
+                                            type="email"
+                                            value={guestEmail}
+                                            onChange={e => setGuestEmail(e.target.value)}
+                                            placeholder="you@example.com"
+                                            className="co-input"
+                                        />
                                     </div>
                                     <div className="co-form-grid">
                                         <div>
@@ -643,47 +644,28 @@ export default function CheckoutPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.3 }}
                                 className="co-card"
-                                style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', padding: '20px 24px', marginTop: '14px' }}
+                                style={{ display: 'flex', gap: '20px', alignItems: 'stretch', padding: '20px 24px', marginTop: '14px' }}
                             >
                                 <div style={{ width: '84px', height: '84px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #ebebeb', flexShrink: 0, background: '#f9f9f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <img src={item.image} alt={item.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                                 </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0', fontFamily: "'Inter', sans-serif", lineHeight: 1.4 }}>
-                                                {item.name}
-                                            </h3>
-                                            {item.size && (
-                                                <div style={{ marginBottom: '8px' }}>
-                                                    <span style={{ fontSize: '11px', color: '#666', background: '#f0f0f0', padding: '3px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                                                        Size: {item.size}
-                                                    </span>
-                                                </div>
-                                            )}
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: '16px' }}>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+                                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0', fontFamily: "'Inter', sans-serif", lineHeight: 1.4 }}>
+                                            {item.name}
+                                        </h3>
+                                    </div>
 
-                                            {/* Price Row */}
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
-                                                    ৳{item.price.toLocaleString()}
-                                                </span>
-                                                {item.originalPrice && (
-                                                    <>
-                                                        <span style={{ fontSize: '13px', color: '#aaa', textDecoration: 'line-through' }}>
-                                                            ৳{Math.ceil(item.originalPrice).toLocaleString()}
-                                                        </span>
-                                                        {discount > 0 && (
-                                                            <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 700 }}>
-                                                                {discount}% OFF
-                                                            </span>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-end',
+                                        justifyContent: 'space-between',
+                                        textAlign: 'right',
+                                        flexShrink: 0,
+                                    }}>
+                                        <div>
+                                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#1a1a1a', fontFamily: "'Outfit', sans-serif" }}>
                                                 ৳{(item.price * item.quantity).toLocaleString()}
                                             </span>
                                             {item.quantity > 1 && (
@@ -692,41 +674,45 @@ export default function CheckoutPage() {
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
 
-                                    {/* Action Row: Quantity Selector + Remove Button */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden', height: '32px', background: '#fff' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e0e0e0', borderRadius: '10px', overflow: 'hidden', background: '#fff', marginTop: '12px' }}>
                                             <button
                                                 type="button"
-                                                onClick={() => updateQuantity(item.id, item.quantity - 1, item.size)}
-                                                disabled={item.quantity <= 1}
-                                                style={{ width: '32px', height: '100%', border: 'none', background: 'none', cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.quantity <= 1 ? '#ccc' : '#666', outline: 'none' }}
+                                                onClick={() => {
+                                                    if (item.quantity <= 1) {
+                                                        removeFromCart(item.id, item.size);
+                                                    } else {
+                                                        updateQuantity(item.id, item.quantity - 1, item.size);
+                                                    }
+                                                }}
+                                                style={{
+                                                    width: '28px', height: '28px', border: 'none', background: '#fafafa',
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    transition: 'background 0.15s',
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = '#fafafa'}
                                             >
-                                                -
+                                                <Minus size={12} color="#555" />
                                             </button>
-                                            <span style={{ width: '36px', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: '#1a1a1a' }}>
+                                            <span style={{ width: '32px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#1a1a1a', background: '#fff' }}>
                                                 {item.quantity}
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={() => updateQuantity(item.id, item.quantity + 1, item.size)}
                                                 disabled={item.quantity >= (item.stockQuantity || 999)}
-                                                style={{ width: '32px', height: '100%', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', outline: 'none' }}
+                                                style={{
+                                                    width: '28px', height: '28px', border: 'none', background: '#fafafa',
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    transition: 'background 0.15s',
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = '#fafafa'}
                                             >
-                                                +
+                                                <Plus size={12} color="#555" />
                                             </button>
                                         </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => removeFromCart(item.id, item.size)}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: 'none', background: 'none', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', fontWeight: 600, color: '#ef4444', borderRadius: '6px', transition: 'background 0.2s' }}
-                                            onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                        >
-                                            <Trash2 size={13} /> Remove
-                                        </button>
                                     </div>
                                 </div>
                             </motion.div>
@@ -964,27 +950,42 @@ export default function CheckoutPage() {
 
                         {/* Terms & Conditions Checkbox — only for guest users */}
                         {!user && (
-                            <div style={{ marginBottom: '14px', marginTop: '10px' }}>
-                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#555', userSelect: 'none' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={agreedToTerms}
-                                        onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                        style={{ marginTop: '2px', cursor: 'pointer' }}
-                                    />
-                                    <span>
-                                        I agree to the{' '}
-                                        <Link href="/terms" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
-                                            Terms of Service
-                                        </Link>{' '}
-                                        and{' '}
-                                        <Link href="/privacy" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
-                                            Privacy Policy
-                                        </Link>
-                                        .
-                                    </span>
-                                </label>
-                            </div>
+                            <motion.label
+                                animate={shakeTerms ? {
+                                    x: [0, -4, 4, -4, 4, -2, 2, 0],
+                                    color: ['#555', '#ef4444', '#ef4444', '#555'],
+                                } : {}}
+                                transition={{ duration: 0.4 }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    color: '#555',
+                                    userSelect: 'none',
+                                    marginBottom: '14px',
+                                    marginTop: '10px',
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                    style={{ marginTop: '2px', cursor: 'pointer' }}
+                                />
+                                <span>
+                                    I agree to the{' '}
+                                    <Link href="/terms" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
+                                        Terms & Conditions
+                                    </Link>{' '}
+                                    and{' '}
+                                    <Link href="/shipping" target="_blank" style={{ color: '#1a1a1a', fontWeight: 600, textDecoration: 'underline' }}>
+                                        Delivery Policy
+                                    </Link>
+                                    .
+                                </span>
+                            </motion.label>
                         )}
 
                         {error && (
@@ -1418,7 +1419,6 @@ export default function CheckoutPage() {
                     }
                     .co-summary-wrap { position: static; }
                     .co-card { padding: 18px 16px; border-radius: 14px; }
-                    .co-form-grid { grid-template-columns: 1fr; }
                     .co-total-val { font-size: 20px; }
                     .co-trust { gap: 16px; }
                     .co-checkout-items { display: none !important; }

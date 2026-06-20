@@ -60,6 +60,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: var(--font-outfit), sans-serif !important;
 }
 
 html {
@@ -68,7 +69,7 @@ html {
 }
 
 body {
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-outfit), sans-serif;
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   line-height: 1.6;
@@ -83,7 +84,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-outfit), var(--font-inter), sans-serif;
+  font-family: var(--font-outfit), sans-serif;
   font-weight: 700;
   line-height: 1.15;
 }
@@ -338,9 +339,25 @@ a {
 
 @media (max-width: 640px) {
   .footer-grid {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 32px !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 32px 16px !important;
     padding: 40px 24px 32px !important;
+  }
+  .footer-grid > div:nth-child(1) {
+    grid-column: 1 / -1 !important;
+    order: 1 !important;
+  }
+  .footer-grid > div:nth-child(2) { /* shop */
+    order: 2 !important;
+  }
+  .footer-grid > div:nth-child(3) { /* company */
+    order: 3 !important;
+  }
+  .footer-grid > div:nth-child(4) { /* support */
+    order: 5 !important;
+  }
+  .footer-grid > div:nth-child(5) { /* legal */
+    order: 4 !important;
   }
 }
 
@@ -389,6 +406,7 @@ a {
   .pdp-thumbnails::-webkit-scrollbar {
     height: 4px;
   }
+
   .pdp-thumbnails::-webkit-scrollbar-thumb {
     background: #ccc;
     border-radius: 4px;
@@ -537,12 +555,18 @@ a {
 
 /* ===== Cart Page Responsive — Mobile (≤768px) ===== */
 @media (max-width: 768px) {
+
+  html,
+  body {
+    overflow-y: auto !important;
+  }
+
   .cart-breadcrumb {
     padding: 14px 20px !important;
   }
 
   .cart-container {
-    padding: 0 20px 48px !important;
+    padding: 0 20px 120px !important;
   }
 
   .cart-grid {
@@ -570,14 +594,36 @@ a {
   }
 }
 
+/* Sticky checkout button hidden on desktop */
+.cart-sticky-checkout-btn {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .cart-sticky-checkout-btn {
+    display: block !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+    z-index: 999 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1) !important;
+    padding: 16px !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
 /* ===== Cart Page Responsive — Small Mobile (≤640px) ===== */
 @media (max-width: 640px) {
   .cart-breadcrumb {
     padding: 12px 16px !important;
   }
-  
+
   .cart-container {
-    padding: 0 16px 48px !important;
+    padding: 0 16px 120px !important;
   }
 
   .cart-item-card {
@@ -599,24 +645,24 @@ a {
     flex: 1 !important;
     min-width: 0 !important;
     width: auto !important;
-    padding-right: 0 !important;
+    padding-right: 90px !important;
   }
 
   .cart-item-actions {
     display: flex !important;
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 8px !important;
     margin-top: 12px !important;
   }
 
   .cart-item-total {
-    position: static !important;
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
     text-align: right !important;
-    flex-shrink: 0 !important;
-    margin-left: 0 !important;
   }
-  
+
   .cart-item-total p {
     font-size: 15px !important;
   }
@@ -647,7 +693,7 @@ a {
     gap: 10px !important;
   }
 
-  .profile-stats > div {
+  .profile-stats>div {
     padding: 14px 10px !important;
   }
 
@@ -693,7 +739,7 @@ a {
     gap: 8px !important;
   }
 
-  .profile-stats > div {
+  .profile-stats>div {
     padding: 12px 6px !important;
     border-radius: 10px !important;
   }
@@ -711,11 +757,25 @@ a {
 
 /* ===== Cart Bounce Animation ===== */
 @keyframes cart-bounce {
-  0% { transform: scale(1); }
-  25% { transform: scale(1.35); }
-  50% { transform: scale(0.9); }
-  75% { transform: scale(1.15); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  25% {
+    transform: scale(1.35);
+  }
+
+  50% {
+    transform: scale(0.9);
+  }
+
+  75% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .cart-bounce {
@@ -724,9 +784,20 @@ a {
 
 /* ===== Add to Cart Checkmark Animation ===== */
 @keyframes checkmark-pop {
-  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-  50% { transform: scale(1.2) rotate(0deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
 }
 
 .cart-added-check {
@@ -738,7 +809,8 @@ a {
    ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 1024px) {
-/* Section headers */
+
+  /* Section headers */
   .section-header-row {
     padding: 0 24px !important;
   }
@@ -781,62 +853,63 @@ a {
    ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-/* Section headers */
+
+  /* Section headers */
   .section-header-row {
-    padding: 0 16px !important;
-    margin-bottom: 18px !important;
+    padding: 0 3.8vw !important;
+    margin-bottom: 2.2vh !important;
   }
 
   .section-header-row h2 {
-    font-size: 20px !important;
-    margin-bottom: 2px !important;
+    font-size: 5.8vw !important;
+    margin-bottom: 0.25vh !important;
   }
 
   .section-header-row p {
-    font-size: 13px !important;
+    display: none !important;
   }
 
   .section-header-row .view-all-btn {
-    padding: 8px 16px !important;
-    font-size: 12px !important;
+    padding: 1vh 3.8vw !important;
+    font-size: 2.9vw !important;
   }
 
   /* Product carousel cards — 2 per view */
   .carousel-cards-container {
-    padding: 0 16px !important;
+    padding: 0 3.8vw !important;
   }
 
   .carousel-scroll-track,
   .vc-scroll-track {
-    gap: 12px !important;
+    gap: 2.9vw !important;
   }
 
   .carousel-card {
-    min-width: calc((100% - 24px) / 2.10) !important;
-    max-width: calc((100% - 24px) / 2.10) !important;
-    height: auto !important;
+    min-width: 56vw !important;
+    max-width: 56vw !important;
+    height: 53vh !important;
   }
 
   .carousel-card .card-image-area {
-    height: 230px !important;
+    height: 31vh !important;
   }
 
   .carousel-card .card-title {
-    font-size: 13px !important;
+    font-size: 4.6vw !important;
   }
 
   .carousel-card .card-desc {
-    font-size: 11px !important;
-    margin-bottom: 8px !important;
+    font-size: 2.7vw !important;
+    margin-bottom: 1vh !important;
   }
 
   .carousel-card .card-price {
-    font-size: 18px !important;
+    font-size: 4.3vw !important;
   }
 
   .carousel-card .card-add-btn {
-    padding: 9px 0 !important;
-    font-size: 12px !important;
+    padding: 1.1vh 0 !important;
+    font-size: 2.9vw !important;
   }
 
   /* Scroll arrows — hide on mobile (swipe to scroll) */
@@ -847,66 +920,66 @@ a {
   /* Brands grid — 2 columns on mobile */
   .brands-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-    padding: 0 16px !important;
-    gap: 10px !important;
+    padding: 0 3.8vw !important;
+    gap: 2.4vw !important;
   }
 
   .brand-card {
-    height: 155px !important;
+    height: 17.3vh !important;
   }
 
   .brand-card .brand-name {
-    font-size: 13px !important;
-    letter-spacing: 1px !important;
+    font-size: 3.1vw !important;
+    letter-spacing: 0.24vw !important;
   }
 
   .brand-card .brand-tagline {
-    font-size: 9px !important;
+    font-size: 2.2vw !important;
   }
 
   .brand-card .brand-products-pill {
-    padding: 4px 10px !important;
-    font-size: 10px !important;
-    bottom: 10px !important;
+    padding: 0.5vh 2.4vw !important;
+    font-size: 2.4vw !important;
+    bottom: 1.1vh !important;
   }
 
   /* Visible Change (Before/After) cards */
   .vc-card {
-    min-width: calc((100% - 24px) / 2.10) !important;
-    max-width: calc((100% - 24px) / 2.10) !important;
+    min-width: 56vw !important;
+    max-width: 56vw !important;
   }
 
   .vc-card .vc-image-area {
-    height: 130px !important;
+    height: 14.5vh !important;
   }
 
   .vc-card .vc-info {
-    padding: 10px 10px 12px !important;
-    gap: 8px !important;
+    padding: 1.1vh 2.4vw 1.3vh !important;
+    gap: 1.9vw !important;
   }
 
   .vc-card .vc-thumb {
-    width: 32px !important;
-    height: 32px !important;
+    width: 7.7vw !important;
+    height: 7.7vw !important;
   }
 
   .vc-card .vc-product-name {
-    font-size: 10px !important;
+    font-size: 2.4vw !important;
   }
 
   .vc-card .vc-price {
-    font-size: 14px !important;
+    font-size: 3.4vw !important;
   }
 
   /* Section padding */
   .homepage-section {
-    padding: 24px 0 28px !important;
+    padding: 2.7vh 0 3.1vh !important;
   }
 
   /* Header adjustments for mobile */
   .header-inner {
-    padding: 0 12px !important;
-    gap: 12px !important;
+    padding: 0 2.9vw !important;
+    gap: 2.9vw !important;
   }
 
   .header-logo {
@@ -915,13 +988,13 @@ a {
   }
 
   .header-logo span {
-    font-size: 18px !important;
-    letter-spacing: 2px !important;
+    font-size: 4.3vw !important;
+    letter-spacing: 0.48vw !important;
   }
 
   /* Hero Carousel Square on Mobile */
   .hero-section {
-    aspect-ratio: 1 / 1 !important;
+    aspect-ratio: 16 / 13.5 !important;
   }
 
   .hero-slide-content {
@@ -936,6 +1009,7 @@ a {
   .desktop-hero-image {
     display: none !important;
   }
+
   .mobile-hero-image {
     display: block !important;
     height: 100% !important;
@@ -943,7 +1017,7 @@ a {
 
   /* Footer adjustments */
   .footer-bottom-bar {
-    padding: 20px 16px !important;
+    padding: 2.2vh 3.8vw !important;
     flex-direction: column !important;
     text-align: center;
   }
@@ -954,82 +1028,87 @@ a {
    ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 480px) {
-/* Section headers tighter */
+
+  /* Section headers tighter */
   .section-header-row {
-    padding: 0 12px !important;
+    padding: 0 3.3vw !important;
     flex-direction: row !important;
     align-items: flex-end !important;
     justify-content: space-between !important;
-    gap: 8px !important;
+    gap: 2.2vw !important;
   }
 
   .section-header-row h2 {
-    font-size: 18px !important;
+    font-size: 6.1vw !important;
   }
 
   /* Product cards tighter */
   .carousel-cards-container {
-    padding: 0 12px !important;
+    padding: 0 3.3vw !important;
   }
 
   .carousel-scroll-track,
   .vc-scroll-track {
-    gap: 10px !important;
+    gap: 2.8vw !important;
   }
 
   .carousel-card {
-    min-width: calc((100% - 20px) / 2.10) !important;
-    max-width: calc((100% - 20px) / 2.10) !important;
-    height: auto !important;
+    min-width: 56vw !important;
+    max-width: 56vw !important;
+    height: 53vh !important;
   }
 
   .carousel-card .card-image-area {
-    height: 190px !important;
+    height: 28vh !important;
+  }
+
+  .carousel-card .card-title {
+    font-size: 4.1vw !important;
   }
 
   .carousel-card .card-content {
-    padding: 10px 10px 12px !important;
+    padding: 1.2vh 2.8vw 1.5vh !important;
   }
 
   .carousel-card .card-price {
-    font-size: 16px !important;
+    font-size: 4.4vw !important;
   }
 
   .carousel-card .card-original-price {
-    font-size: 12px !important;
+    font-size: 3.3vw !important;
   }
 
   /* Brands — tighter */
   .brands-grid {
-    padding: 0 12px !important;
-    gap: 8px !important;
+    padding: 0 3.3vw !important;
+    gap: 2.2vw !important;
   }
 
   .brand-card {
-    height: 132px !important;
-    border-radius: 10px !important;
+    height: 16.5vh !important;
+    border-radius: 2.8vw !important;
   }
 
   /* VC cards tighter */
   .vc-card {
-    min-width: calc((100% - 20px) / 2.10) !important;
-    max-width: calc((100% - 20px) / 2.10) !important;
+    min-width: 56vw !important;
+    max-width: 56vw !important;
   }
 
   .vc-card .vc-image-area {
-    height: 110px !important;
+    height: 13.7vh !important;
   }
 
   .vc-card .vc-cart-btn {
-    width: 30px !important;
-    height: 30px !important;
+    width: 8.3vw !important;
+    height: 8.3vw !important;
   }
 
   /* Footer */
   .footer-grid {
-    padding: 32px 16px 24px !important;
-    grid-template-columns: 1fr !important;
-    gap: 24px !important;
+    padding: 4vh 4.4vw 3vh !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 3vh 16px !important;
   }
 }
 
@@ -1038,6 +1117,7 @@ a {
    ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 1024px) {
+
   .shop-header-inner,
   .shop-filters-container,
   .shop-count-container,
@@ -1051,6 +1131,7 @@ a {
   .shop-header {
     padding: 32px 0 24px !important;
   }
+
   .shop-header-inner,
   .shop-filters-container,
   .shop-count-container,
@@ -1058,13 +1139,14 @@ a {
     padding-left: 16px !important;
     padding-right: 16px !important;
   }
-  
+
   .shop-card-image-area {
     height: 180px !important;
   }
 }
 
 @media (max-width: 480px) {
+
   .shop-header-inner,
   .shop-filters-container,
   .shop-count-container,
@@ -1080,6 +1162,7 @@ a {
 
 /* ===== Print — Invoice Only ===== */
 @media print {
+
   /* Hide header, footer, banner, buttons, and any no-print elements */
   header,
   footer,
@@ -1108,7 +1191,7 @@ a {
   }
 
   /* Remove margins around the invoice wrapper */
-  #printable-invoice > * {
+  #printable-invoice>* {
     break-inside: avoid;
   }
 }
@@ -1118,6 +1201,7 @@ a {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -1133,4 +1217,34 @@ a {
   background: linear-gradient(90deg, #1a1a1d 25%, #252529 50%, #1a1a1d 75%) !important;
   background-size: 200% 100% !important;
   animation: shimmer 1.5s infinite linear !important;
+}
+
+/* ===== Responsive Shop Card height and spacing ===== */
+.shop-product-card {
+  --card-height: 532px;
+}
+
+@media (max-width: 768px) {
+  .shop-product-card {
+    --card-height: 340px;
+  }
+
+  .shop-card-image-area {
+    height: 45% !important;
+  }
+
+  .shop-card-content {
+    padding: 10px 10px 12px !important;
+  }
+
+  .shop-card-title {
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    margin-bottom: 2px !important;
+  }
+
+  .shop-card-desc {
+    display: none !important;
+    /* Hide description on mobile to keep the card compact */
+  }
 }

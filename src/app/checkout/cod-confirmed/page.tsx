@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-    CheckCircle, Package, ArrowRight, Home, MapPin,
+    Package, ArrowRight, Home, MapPin,
     Phone, Wallet, Printer, ShoppingBag, Tag,
     Download, ImageIcon, FileText, Loader2,
 } from 'lucide-react';
@@ -141,13 +141,16 @@ export default function CODConfirmedPage() {
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
                     style={{
-                        width: 72, height: 72, borderRadius: '50%',
-                        background: 'rgba(34,197,94,0.15)', display: 'flex',
+                        width: 120, height: 120, display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
-                        margin: '0 auto 20px',
+                        margin: '0 auto 12px', overflow: 'hidden'
                     }}
                 >
-                    <CheckCircle size={36} color="#22c55e" />
+                    <iframe
+                        src="https://lottie.host/embed/8d6dda2a-e2db-452d-88e6-0df48bbb7935/YFAPQBpKNg.lottie"
+                        style={{ border: 'none', width: '100%', height: '100%' }}
+                        title="Order Confirmed"
+                    />
                 </motion.div>
                 <motion.h1
                     initial={{ opacity: 0, y: 12 }}
@@ -426,7 +429,7 @@ export default function CODConfirmedPage() {
 
                     {/* Navigation buttons */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                        <Link href="/shop" style={{
+                        <Link href="/" style={{
                             display: 'inline-flex', alignItems: 'center', gap: 8, width: '100%',
                             padding: '14px 32px', background: 'linear-gradient(135deg, #f5c518, #e6b800)',
                             color: '#1a1a1a', borderRadius: 14, fontSize: 14, fontWeight: 700,

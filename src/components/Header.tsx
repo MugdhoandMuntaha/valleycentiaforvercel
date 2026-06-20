@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, ShoppingBag, User, Menu, X, ChevronDown, ChevronLeft, ArrowRight, Star, ChevronRight, TrendingUp } from 'lucide-react';
+import { Search, ShoppingBag, User, Menu, X, ChevronDown, ChevronLeft, ArrowRight, Star, ChevronRight, TrendingUp, Sparkles, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/lib/CartContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -83,6 +83,27 @@ export default function Header() {
         };
     }, [profileDropdownOpen]);
 
+    // Prevent body scroll when mobile menu is open
+    useEffect(() => {
+        if (mobileMenuOpen) {
+            document.body.style.overflow = 'hidden';
+            document.body.style.height = '100%';
+            document.documentElement.style.overflow = 'hidden';
+            document.documentElement.style.height = '100%';
+        } else {
+            document.body.style.overflow = '';
+            document.body.style.height = '';
+            document.documentElement.style.overflow = '';
+            document.documentElement.style.height = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+            document.body.style.height = '';
+            document.documentElement.style.overflow = '';
+            document.documentElement.style.height = '';
+        };
+    }, [mobileMenuOpen]);
+
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -90,9 +111,18 @@ export default function Header() {
     const [allProducts, setAllProducts] = useState<SearchProduct[]>([]);
     const [navLinks, setNavLinks] = useState<NavLink[]>([]);
     const [headerSettings, setHeaderSettings] = useState<{ show_announcement: boolean; announcement_text: string }>({
-        show_announcement: true,
+        show_announcement: false,
         announcement_text: 'Free shipping on orders above ৳499',
     });
+
+    // ── AI Search state ──
+    const [aiResults, setAiResults] = useState<SearchProduct[]>([]);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiEnhanced, setAiEnhanced] = useState(false);
+    const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
+    const [aiIntent, setAiIntent] = useState<string | null>(null);
+    const aiAbortRef = useRef<AbortController | null>(null);
+    const aiDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
 
     useEffect(() => {
@@ -153,8 +183,8 @@ export default function Header() {
         recScrollRef.current.scrollBy({ left: dir === 'left' ? -amt : amt, behavior: 'smooth' });
     }, []);
 
-    // Search filtering
-    const filteredProducts = useMemo(() => {
+    // Search filtering (instant client-side)
+    const clientFilteredProducts = useMemo(() => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase().trim();
         const results = allProducts.filter((p) => {
@@ -187,6 +217,77 @@ export default function Header() {
             return 0;
         });
     }, [searchQuery, allProducts]);
+
+    // Use AI/Server results if we have them and we are not currently loading. 
+    // While loading, show instant client-side filter results.
+    const filteredProducts = !aiLoading && aiResults.length > 0 ? aiResults : clientFilteredProducts;
+
+    // Debounced AI search
+    useEffect(() => {
+        const query = searchQuery.trim();
+        if (!query || query.length < 2) {
+            setAiResults([]);
+            setAiEnhanced(false);
+            setCorrectedQuery(null);
+            setAiIntent(null);
+            setAiLoading(false);
+            return;
+        }
+
+        // Cancel previous requests
+        if (aiAbortRef.current) aiAbortRef.current.abort();
+        if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+
+        setAiLoading(true);
+
+        aiDebounceRef.current = setTimeout(async () => {
+            const controller = new AbortController();
+            aiAbortRef.current = controller;
+
+            try {
+                const res = await fetch('/api/ai-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query }),
+                    signal: controller.signal,
+                });
+
+                if (!res.ok) throw new Error('Search failed');
+                const data = await res.json();
+
+                if (!controller.signal.aborted) {
+                    const mapped: SearchProduct[] = (data.products || []).map((p: Record<string, unknown>) => ({
+                        id: String(p.id),
+                        name: p.name as string,
+                        image: (p.primary_image_url as string) || '/no-image.svg',
+                        rating: Number(p.rating_avg) || 0,
+                        reviewCount: Number(p.review_count) || 0,
+                        price: Math.ceil(Number(p.base_price)),
+                        originalPrice: Math.ceil(Number(p.compare_at_price) || 0),
+                        discountPercent: Number(p.discount_percent) || 0,
+                        href: `/product/${p.slug}`,
+                        category: (p.category_name as string) || '',
+                        tags: [...((p.tags as string[]) || []), ...((p.concerns as string[]) || [])],
+                    }));
+
+                    setAiResults(mapped);
+                    setAiEnhanced(!!data.aiEnhanced);
+                    setCorrectedQuery(data.correctedQuery || null);
+                    setAiIntent(data.intent || null);
+                    setAiLoading(false);
+                }
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') return;
+                console.error('[AI Search] Failed:', err);
+                setAiLoading(false);
+                setAiEnhanced(false);
+            }
+        }, 300);
+
+        return () => {
+            if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        };
+    }, [searchQuery]);
 
     const matchingChoices = useMemo(() => {
         if (!searchQuery.trim()) return [];
@@ -289,6 +390,7 @@ export default function Header() {
                             width={229} 
                             height={70} 
                             priority
+                            unoptimized
                             style={{ height: '55px', width: 'auto', objectFit: 'fill' }}
                         />
                     </Link>
@@ -489,12 +591,12 @@ export default function Header() {
                                                                             display: 'inline-flex',
                                                                             alignItems: 'center',
                                                                             gap: '3px',
-                                                                            color: '#e67e22',
+                                                                            color: '#ffb700',
                                                                             fontSize: '13px',
                                                                             fontWeight: 700,
                                                                             fontFamily: "'Inter', sans-serif",
                                                                         }}>
-                                                                            <Star size={12} fill="#e67e22" stroke="#e67e22" />
+                                                                            <Star size={12} fill="#ffb700" stroke="#ffb700" />
                                                                             {product.rating}
                                                                         </span>
                                                                         <span style={{
@@ -550,7 +652,7 @@ export default function Header() {
                                                                                 fontFamily: "'Inter', sans-serif",
                                                                                 fontSize: '11px',
                                                                                 fontWeight: 700,
-                                                                                color: '#e67e22',
+                                                                                color: '#2e7d32',
                                                                             }}>
                                                                                 {Math.ceil(product.discountPercent)}% OFF
                                                                             </span>
@@ -722,23 +824,98 @@ export default function Header() {
                                                 </div>
                                             )}
 
+                                            {/* Corrected query notice */}
+                                            {correctedQuery && aiEnhanced && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    marginBottom: '12px',
+                                                    padding: '8px 12px',
+                                                    background: 'linear-gradient(135deg, #faf5ff, #f0f7ff)',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #e8e0f0',
+                                                }}>
+                                                    <Sparkles size={14} color="#8b5cf6" />
+                                                    <span style={{
+                                                        fontFamily: "'Inter', sans-serif",
+                                                        fontSize: '12px',
+                                                        color: '#6b5b8a',
+                                                    }}>
+                                                        Showing results for <strong style={{ color: '#1a1a1a' }}>{correctedQuery}</strong>
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             {/* Search results header */}
-                                            <p style={{
-                                                fontFamily: "'Inter', sans-serif",
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                color: '#999',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.8px',
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
                                                 marginBottom: '12px',
                                             }}>
-                                                {filteredProducts.length > 0
-                                                    ? `${filteredProducts.length} Result${filteredProducts.length > 1 ? 's' : ''}`
-                                                    : 'No results found'}
-                                            </p>
+                                                <p style={{
+                                                    fontFamily: "'Inter', sans-serif",
+                                                    fontSize: '11px',
+                                                    fontWeight: 600,
+                                                    color: '#999',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.8px',
+                                                    margin: 0,
+                                                }}>
+                                                    {aiLoading
+                                                        ? 'Searching...'
+                                                        : filteredProducts.length > 0
+                                                            ? `${filteredProducts.length} Result${filteredProducts.length > 1 ? 's' : ''}`
+                                                            : 'No results found'}
+                                                </p>
+                                                {aiEnhanced && !aiLoading && (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        padding: '3px 10px',
+                                                        borderRadius: '12px',
+                                                        background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
+                                                        border: '1px solid #e0d8f0',
+                                                        fontSize: '10px',
+                                                        fontWeight: 600,
+                                                        color: '#7c3aed',
+                                                        fontFamily: "'Inter', sans-serif",
+                                                        letterSpacing: '0.3px',
+                                                    }}>
+                                                        <Sparkles size={10} />
+                                                        AI Enhanced
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* AI Loading skeleton */}
+                                            {aiLoading && clientFilteredProducts.length === 0 && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0',
+                                                }}>
+                                                    {[1, 2, 3].map((i) => (
+                                                        <div key={i} style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '14px',
+                                                            padding: '12px 8px',
+                                                        }}>
+                                                            <div className="shimmer" style={{ width: 56, height: 56, borderRadius: 8, flexShrink: 0 }} />
+                                                            <div style={{ flex: 1 }}>
+                                                                <div className="shimmer" style={{ width: '70%', height: 14, borderRadius: 4, marginBottom: 8 }} />
+                                                                <div className="shimmer" style={{ width: '40%', height: 12, borderRadius: 4 }} />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
 
                                             {/* Filtered product list */}
-                                            {filteredProducts.length > 0 ? (
+                                            {(!aiLoading || clientFilteredProducts.length > 0) && filteredProducts.length > 0 ? (
                                                 <div style={{
                                                     display: 'flex',
                                                     flexDirection: 'column',
@@ -751,7 +928,7 @@ export default function Header() {
                                                         <Link
                                                             key={product.id}
                                                             href={product.href}
-                                                            onClick={() => { setSearchFocused(false); setSearchQuery(''); }}
+                                                            onClick={() => { setSearchFocused(false); setSearchQuery(''); setAiResults([]); setAiEnhanced(false); setCorrectedQuery(null); }}
                                                             style={{
                                                                 display: 'flex',
                                                                 alignItems: 'center',
@@ -804,12 +981,12 @@ export default function Header() {
                                                                         display: 'inline-flex',
                                                                         alignItems: 'center',
                                                                         gap: '3px',
-                                                                        color: '#e67e22',
+                                                                        color: '#ffb700',
                                                                         fontSize: '12px',
                                                                         fontWeight: 700,
                                                                         fontFamily: "'Inter', sans-serif",
                                                                     }}>
-                                                                        <Star size={11} fill="#e67e22" stroke="#e67e22" />
+                                                                        <Star size={11} fill="#ffb700" stroke="#ffb700" />
                                                                         {product.rating}
                                                                     </span>
                                                                     <span style={{ color: '#ccc', fontSize: '12px' }}>|</span>
@@ -827,7 +1004,7 @@ export default function Header() {
                                                                             fontFamily: "'Inter', sans-serif",
                                                                             fontSize: '11px',
                                                                             fontWeight: 700,
-                                                                            color: '#e67e22',
+                                                                            color: '#2e7d32',
                                                                         }}>
                                                                             {Math.ceil(product.discountPercent)}% OFF
                                                                         </span>
@@ -840,7 +1017,7 @@ export default function Header() {
                                                         </Link>
                                                     ))}
                                                 </div>
-                                            ) : (
+                                            ) : (!aiLoading && (
                                                 <div style={{
                                                     textAlign: 'center',
                                                     padding: '30px 20px',
@@ -863,7 +1040,7 @@ export default function Header() {
                                                         Try searching for shampoo, serum, sunscreen...
                                                     </p>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
                                     )}
                                 </motion.div>
@@ -1196,27 +1373,89 @@ export default function Header() {
                                     </div>
                                 ) : (
                                     <div style={{ padding: '16px' }}>
-                                        <p style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            color: '#999',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.8px',
+                                        {/* Mobile AI search header */}
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
                                             marginBottom: '12px',
                                         }}>
-                                            {filteredProducts.length > 0
-                                                ? `${filteredProducts.length} Result${filteredProducts.length > 1 ? 's' : ''}`
-                                                : 'No results found'}
-                                        </p>
+                                            <p style={{
+                                                fontFamily: "'Inter', sans-serif",
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                color: '#999',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.8px',
+                                                margin: 0,
+                                            }}>
+                                                {aiLoading
+                                                    ? 'Searching...'
+                                                    : filteredProducts.length > 0
+                                                        ? `${filteredProducts.length} Result${filteredProducts.length > 1 ? 's' : ''}`
+                                                        : 'No results found'}
+                                            </p>
+                                            {aiEnhanced && !aiLoading && (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    padding: '3px 8px',
+                                                    borderRadius: '10px',
+                                                    background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
+                                                    border: '1px solid #e0d8f0',
+                                                    fontSize: '9px',
+                                                    fontWeight: 600,
+                                                    color: '#7c3aed',
+                                                    fontFamily: "'Inter', sans-serif",
+                                                }}>
+                                                    <Sparkles size={9} />
+                                                    AI
+                                                </span>
+                                            )}
+                                        </div>
 
-                                        {filteredProducts.length > 0 ? (
+                                        {/* Mobile corrected query */}
+                                        {correctedQuery && aiEnhanced && (
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                marginBottom: '12px',
+                                                padding: '6px 10px',
+                                                background: '#faf5ff',
+                                                borderRadius: '6px',
+                                                border: '1px solid #e8e0f0',
+                                            }}>
+                                                <Sparkles size={12} color="#8b5cf6" />
+                                                <span style={{ fontSize: '11px', color: '#6b5b8a', fontFamily: "'Inter', sans-serif" }}>
+                                                    Results for <strong style={{ color: '#1a1a1a' }}>{correctedQuery}</strong>
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Mobile AI Loading skeleton */}
+                                        {aiLoading && clientFilteredProducts.length === 0 && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {[1, 2, 3].map((i) => (
+                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px' }}>
+                                                        <div className="shimmer" style={{ width: 48, height: 48, borderRadius: 6, flexShrink: 0 }} />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div className="shimmer" style={{ width: '65%', height: 13, borderRadius: 4, marginBottom: 6 }} />
+                                                            <div className="shimmer" style={{ width: '35%', height: 11, borderRadius: 4 }} />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {(!aiLoading || clientFilteredProducts.length > 0) && filteredProducts.length > 0 ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 {filteredProducts.map((product) => (
                                                     <Link
                                                         key={product.id}
                                                         href={product.href}
-                                                        onClick={() => { setSearchFocused(false); setSearchQuery(''); }}
+                                                        onClick={() => { setSearchFocused(false); setSearchQuery(''); setAiResults([]); setAiEnhanced(false); setCorrectedQuery(null); }}
                                                         style={{
                                                             display: 'flex',
                                                             alignItems: 'center',
@@ -1278,13 +1517,13 @@ export default function Header() {
                                                     </Link>
                                                 ))}
                                             </div>
-                                        ) : (
+                                        ) : (!aiLoading && (
                                             <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                                 <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '13px', color: '#999', margin: 0 }}>
                                                     No products found for &ldquo;{searchQuery}&rdquo;
                                                 </p>
                                             </div>
-                                        )}
+                                        ))}
                                     </div>
                                 )}
                             </motion.div>
@@ -1424,66 +1663,95 @@ export default function Header() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
                         style={{
                             position: 'fixed',
                             inset: 0,
                             zIndex: 1100,
-                            background: 'rgba(0,0,0,0.7)',
-                            backdropFilter: 'blur(8px)',
+                            background: 'rgba(0, 0, 0, 0.4)',
+                            backdropFilter: 'blur(6px)',
                         }}
                         onClick={() => setMobileMenuOpen(false)}
                     >
                         <motion.div
-                            initial={{ x: '100%' }}
+                            initial={{ x: '-100%' }}
                             animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'tween', duration: 0.3 }}
+                            exit={{ x: '-100%' }}
+                            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.4 }}
                             onClick={(e) => e.stopPropagation()}
                             style={{
                                 position: 'absolute',
-                                right: 0,
+                                left: 0,
                                 top: 0,
                                 bottom: 0,
-                                width: '300px',
-                                background: '#111111',
-                                padding: '24px 24px 32px',
+                                width: '290px',
+                                background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+                                padding: '20px 20px 32px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '4px',
                                 overflowY: 'auto',
+                                boxShadow: '8px 0 32px rgba(0, 0, 0, 0.1)',
+                                borderTopRightRadius: '16px',
+                                borderBottomRightRadius: '16px',
                             }}
                         >
-                            {/* Close Button */}
-                            <button
-                                onClick={() => setMobileMenuOpen(false)}
-                                style={{
-                                    alignSelf: 'flex-end',
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#ffffff',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    marginBottom: '12px',
-                                }}
-                                aria-label="Close menu"
-                            >
-                                <X size={24} />
-                            </button>
+                            {/* Drawer Header */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: '20px',
+                                paddingBottom: '12px',
+                                borderBottom: '1px solid rgba(0, 0, 0, 0.05)'
+                            }}>
+                                <Link href="/" onClick={() => setMobileMenuOpen(false)}>
+                                    <Image 
+                                        src="/logo69.png" 
+                                        alt="ValleyCentia Logo" 
+                                        width={140} 
+                                        height={42} 
+                                        priority
+                                        unoptimized
+                                        style={{ height: '32px', width: 'auto', objectFit: 'contain' }}
+                                    />
+                                </Link>
+                                <button
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    style={{
+                                        background: 'rgba(0,0,0,0.04)',
+                                        border: 'none',
+                                        color: '#1a1a1a',
+                                        cursor: 'pointer',
+                                        padding: '8px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                                    aria-label="Close menu"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
 
                             {/* Mobile Search */}
                             <div
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    background: '#1e1e1e',
-                                    borderRadius: '8px',
-                                    border: '1px solid #333',
-                                    padding: '0 12px',
+                                    background: '#f5f5f7',
+                                    borderRadius: '20px',
+                                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                                    padding: '0 16px',
                                     height: '40px',
-                                    marginBottom: '16px',
+                                    marginBottom: '20px',
+                                    transition: 'all 0.2s ease',
                                 }}
                             >
-                                <Search size={16} style={{ color: '#888', flexShrink: 0 }} />
+                                <Search size={15} style={{ color: '#888', flexShrink: 0 }} />
                                 <input
                                     type="text"
                                     placeholder="Search..."
@@ -1495,7 +1763,7 @@ export default function Header() {
                                         outline: 'none',
                                         width: '100%',
                                         fontSize: '14px',
-                                        color: '#ffffff',
+                                        color: '#1a1a1a',
                                         padding: '0 10px',
                                         fontFamily: "'Inter', sans-serif",
                                     }}
@@ -1504,7 +1772,7 @@ export default function Header() {
 
                             {/* Mobile Menu Search Results */}
                             {hasQuery && (
-                                <div style={{ background: '#1e1e1e', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                                <div style={{ background: '#f5f5f7', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '12px', padding: '12px', marginBottom: '16px' }}>
                                     {filteredProducts.length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
                                             {filteredProducts.map((product) => (
@@ -1512,16 +1780,16 @@ export default function Header() {
                                                     key={product.id}
                                                     href={product.href}
                                                     onClick={() => { setMobileMenuOpen(false); setSearchQuery(''); }}
-                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#fff' }}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#1a1a1a' }}
                                                 >
-                                                    <div style={{ width: '40px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                                                    <div style={{ width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                                                         <Image src={product.image} alt={product.name} fill sizes="40px" style={{ objectFit: 'cover' }} />
                                                     </div>
                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Inter', sans-serif" }}>
+                                                        <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: "'Inter', sans-serif", color: '#1a1a1a' }}>
                                                             {product.name}
                                                         </p>
-                                                        <p style={{ margin: 0, fontSize: '12px', color: '#aaa', fontFamily: "'Inter', sans-serif" }}>
+                                                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#1a1a1a', fontFamily: "'Inter', sans-serif" }}>
                                                             ৳{product.price}
                                                         </p>
                                                     </div>
@@ -1545,27 +1813,52 @@ export default function Header() {
                             ))}
 
                             {/* Mobile User Actions */}
-                            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #333' }}>
+                            <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
                                 {user ? (
                                     <>
-                                        <div style={{ padding: '0 8px 12px 8px', borderBottom: '1px solid #222', marginBottom: '8px' }}>
-                                            <p style={{ margin: 0, fontSize: '11px', color: '#888', fontWeight: 500 }}>Signed in as</p>
-                                            <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {user.email}
-                                            </p>
+                                        <div style={{ 
+                                            padding: '12px 16px', 
+                                            background: '#f8f9fa', 
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(0, 0, 0, 0.04)',
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px'
+                                        }}>
+                                            <div style={{
+                                                width: '32px', height: '32px', borderRadius: '50%',
+                                                background: 'linear-gradient(135deg, #1a1a1a, #333333)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '12px', fontWeight: 800, color: '#ffffff',
+                                                fontFamily: "'Outfit', sans-serif",
+                                                flexShrink: 0
+                                            }}>
+                                                {(user.fullName || user.name || user.email || 'U').charAt(0).toUpperCase()}
+                                            </div>
+                                            <div style={{ minWidth: 0, flex: 1 }}>
+                                                <p style={{ margin: 0, fontSize: '10px', color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Signed in as</p>
+                                                <p style={{ margin: '1px 0 0 0', fontSize: '13px', color: '#1a1a1a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Inter', sans-serif" }}>
+                                                    {user.email}
+                                                </p>
+                                            </div>
                                         </div>
                                         <Link
                                             href="/profile"
                                             onClick={() => setMobileMenuOpen(false)}
                                             style={{
-                                                display: 'block',
-                                                fontSize: '15px',
-                                                fontWeight: 500,
-                                                color: '#ccc',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                fontSize: '14px',
+                                                fontWeight: 600,
+                                                color: '#1a1a1a',
                                                 padding: '12px 8px',
                                                 textDecoration: 'none',
+                                                fontFamily: "'Outfit', sans-serif",
                                             }}
                                         >
+                                            <User size={16} />
                                             My Profile
                                         </Link>
                                         {user.role === 'admin' && (
@@ -1573,14 +1866,18 @@ export default function Header() {
                                                 href="/admin"
                                                 onClick={() => setMobileMenuOpen(false)}
                                                 style={{
-                                                    display: 'block',
-                                                    fontSize: '15px',
-                                                    fontWeight: 500,
-                                                    color: '#ccc',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    fontSize: '14px',
+                                                    fontWeight: 600,
+                                                    color: '#1a1a1a',
                                                     padding: '12px 8px',
                                                     textDecoration: 'none',
+                                                    fontFamily: "'Outfit', sans-serif",
                                                 }}
                                             >
+                                                <Sparkles size={16} />
                                                 Admin Panel
                                             </Link>
                                         )}
@@ -1590,20 +1887,23 @@ export default function Header() {
                                                 await signOut();
                                             }}
                                             style={{
-                                                display: 'block',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
                                                 width: '100%',
                                                 textAlign: 'left',
-                                                fontSize: '15px',
-                                                fontWeight: 500,
+                                                fontSize: '14px',
+                                                fontWeight: 600,
                                                 color: '#ef4444',
                                                 padding: '12px 8px',
                                                 textDecoration: 'none',
                                                 background: 'none',
                                                 border: 'none',
                                                 cursor: 'pointer',
-                                                fontFamily: "'Inter', sans-serif",
+                                                fontFamily: "'Outfit', sans-serif",
                                             }}
                                         >
+                                            <LogOut size={16} />
                                             Sign Out
                                         </button>
                                     </>
@@ -1612,14 +1912,18 @@ export default function Header() {
                                         href="/auth"
                                         onClick={() => setMobileMenuOpen(false)}
                                         style={{
-                                            display: 'block',
-                                            fontSize: '15px',
-                                            fontWeight: 500,
-                                            color: '#ccc',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            fontSize: '14px',
+                                            fontWeight: 600,
+                                            color: '#1a1a1a',
                                             padding: '12px 8px',
                                             textDecoration: 'none',
+                                            fontFamily: "'Outfit', sans-serif",
                                         }}
                                     >
+                                        <User size={16} />
                                         Sign In / Register
                                     </Link>
                                 )}
@@ -1666,15 +1970,15 @@ function IconButton({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 function MobileNavItem({ link, onClose }: { link: NavLink; onClose: () => void }) {
     const [open, setOpen] = useState(false);
+    const dropdownItems = link.dropdownItems;
 
     return (
-        <div>
+        <div style={{ borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
             <div
                 style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    borderBottom: '1px solid #222',
                 }}
             >
                 <Link
@@ -1682,11 +1986,13 @@ function MobileNavItem({ link, onClose }: { link: NavLink; onClose: () => void }
                     onClick={onClose}
                     style={{
                         flex: 1,
-                        fontSize: '15px',
-                        fontWeight: 500,
-                        color: '#ccc',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: '#1a1a1a',
                         padding: '14px 8px',
                         textDecoration: 'none',
+                        letterSpacing: '0.2px',
+                        fontFamily: "'Outfit', sans-serif",
                     }}
                 >
                     {link.name}
@@ -1697,8 +2003,8 @@ function MobileNavItem({ link, onClose }: { link: NavLink; onClose: () => void }
                         style={{
                             background: 'none',
                             border: 'none',
-                            color: '#888',
-                            padding: '14px 8px',
+                            color: '#1a1a1a',
+                            padding: '14px 12px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -1709,6 +2015,7 @@ function MobileNavItem({ link, onClose }: { link: NavLink; onClose: () => void }
                             style={{
                                 transition: 'transform 0.2s ease',
                                 transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                                color: '#1a1a1a',
                             }}
                         />
                     </button>
@@ -1716,26 +2023,28 @@ function MobileNavItem({ link, onClose }: { link: NavLink; onClose: () => void }
             </div>
 
             <AnimatePresence>
-                {open && link.dropdownItems && (
+                {open && dropdownItems && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ overflow: 'hidden', background: '#171717' }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        style={{ overflow: 'hidden', background: '#f8f9fa', borderRadius: '8px', marginBottom: '12px' }}
                     >
-                        {link.dropdownItems.map((item, idx) => (
+                        {dropdownItems.map((item, idx) => (
                             <Link
                                 key={idx}
                                 href={item.href}
                                 onClick={onClose}
                                 style={{
                                     display: 'block',
-                                    fontSize: '14px',
-                                    color: '#999',
-                                    padding: '10px 24px',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    color: '#555',
+                                    padding: '10px 16px',
                                     textDecoration: 'none',
-                                    borderBottom: '1px solid #1e1e1e',
+                                    fontFamily: "'Inter', sans-serif",
+                                    borderBottom: idx < dropdownItems.length - 1 ? '1px solid rgba(0,0,0,0.03)' : 'none',
                                 }}
                             >
                                 {item.name}

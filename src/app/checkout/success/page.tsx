@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { CheckCircle, Package, ArrowRight, Home } from 'lucide-react';
+import { Package, ArrowRight, Home } from 'lucide-react';
 import { Suspense, useEffect } from 'react';
 import { useCart } from '@/lib/CartContext';
 
@@ -29,9 +29,13 @@ function SuccessContent() {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                    style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}
+                    style={{ width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', overflow: 'hidden' }}
                 >
-                    <CheckCircle size={40} color="#22c55e" />
+                    <iframe
+                        src="https://lottie.host/embed/8d6dda2a-e2db-452d-88e6-0df48bbb7935/YFAPQBpKNg.lottie"
+                        style={{ border: 'none', width: '100%', height: '100%' }}
+                        title="Order Confirmed"
+                    />
                 </motion.div>
 
                 <h1 style={{ fontFamily: "'Outfit', sans-serif", fontSize: 28, fontWeight: 800, color: '#1a1a1a', marginBottom: 8 }}>
@@ -52,7 +56,7 @@ function SuccessContent() {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
-                    <Link href="/shop" style={{
+                    <Link href="/" style={{
                         display: 'inline-flex', alignItems: 'center', gap: 8,
                         padding: '13px 32px', background: 'linear-gradient(135deg, #f5c518, #e6b800)',
                         color: '#1a1a1a', borderRadius: 28, fontSize: 14, fontWeight: 700,

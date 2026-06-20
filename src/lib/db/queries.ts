@@ -59,6 +59,8 @@ export interface ProductCard {
     badges: { badge: string; label: string | null; color: string | null }[] | null;
     stock_quantity?: number;
     sizes?: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
+    coupon_price?: number | null;
+    coupon_code?: string | null;
 }
 
 export interface BrandData {
@@ -471,6 +473,30 @@ export async function getHomepageSections(): Promise<HomepageSectionData[]> {
     return result;
 }
 
+async function attachCouponsToCards(cards: ProductCard[]): Promise<ProductCard[]> {
+    if (!cards.length) return cards;
+    const productIds = cards.map(c => new mongoose.Types.ObjectId(c.id));
+    const coupons = await ProductCoupon.find({ productId: { $in: productIds } })
+        .populate('couponId', 'code')
+        .lean();
+
+    const couponMap: Record<string, { price: number; code: string }> = {};
+    for (const c of coupons) {
+        const pid = String(c.productId);
+        const couponDoc = c.couponId as unknown as Record<string, unknown> | null;
+        const code = couponDoc ? (couponDoc.code as string) : '';
+        if (!couponMap[pid] || (c.couponPrice !== null && c.couponPrice! < couponMap[pid].price)) {
+            couponMap[pid] = { price: c.couponPrice || 0, code };
+        }
+    }
+
+    return cards.map(c => ({
+        ...c,
+        coupon_price: couponMap[c.id]?.price || null,
+        coupon_code: couponMap[c.id]?.code || null,
+    }));
+}
+
 // ============================================================================
 // PRODUCT CARDS (shop page)
 // ============================================================================
@@ -515,11 +541,11 @@ export async function getProductCards(filters?: ProductFilters): Promise<Product
         .sort(sortObj)
         .lean();
 
-    return products.map(p => {
+    return attachCouponsToCards(products.map(p => {
         const brand = p.brandId as Record<string, unknown> | null;
         const category = p.categoryId as Record<string, unknown> | null;
         return toProductCard(p as unknown as Record<string, unknown>, brand, category);
-    });
+    }));
 }
 
 // ============================================================================
@@ -616,11 +642,11 @@ export async function getRelatedProducts(slug: string, limit: number = 4): Promi
         .limit(limit)
         .lean();
 
-    return products.map(p => {
+    return attachCouponsToCards(products.map(p => {
         const brand = p.brandId as Record<string, unknown> | null;
         const category = p.categoryId as Record<string, unknown> | null;
         return toProductCard(p as unknown as Record<string, unknown>, brand, category);
-    });
+    }));
 }
 
 export async function getRelatedProductsSimple(currentSlug: string, limit: number = 4): Promise<ProductCard[]> {
@@ -648,11 +674,124 @@ export async function searchProducts(query: string): Promise<ProductCard[]> {
         .limit(10)
         .lean();
 
-    return products.map(p => {
+    return attachCouponsToCards(products.map(p => {
         const brand = p.brandId as Record<string, unknown> | null;
         const category = p.categoryId as Record<string, unknown> | null;
         return toProductCard(p as unknown as Record<string, unknown>, brand, category);
+    }));
+}
+
+// ============================================================================
+// AI-POWERED SEARCH
+// ============================================================================
+
+export interface AISearchParams {
+    keywords: string[];
+    categories: string[];
+    concerns: string[];
+    originalQuery: string;
+}
+
+export async function aiSearchProducts(params: AISearchParams): Promise<ProductCard[]> {
+    const { keywords, categories, concerns, originalQuery } = params;
+    if (!keywords.length && !categories.length && !concerns.length) return [];
+
+    await connectToDatabase();
+
+    // Build $or conditions for each keyword across multiple fields
+    const orConditions: Record<string, unknown>[] = [];
+
+    for (const kw of keywords) {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        orConditions.push(
+            { name: { $regex: escaped, $options: 'i' } },
+            { shortDescription: { $regex: escaped, $options: 'i' } },
+            { subtitle: { $regex: escaped, $options: 'i' } },
+            { tags: { $regex: escaped, $options: 'i' } },
+            { 'highlights.highlight': { $regex: escaped, $options: 'i' } },
+        );
+    }
+
+    // Add concern matches
+    for (const concern of concerns) {
+        const escaped = concern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        orConditions.push({ concerns: { $regex: escaped, $options: 'i' } });
+    }
+
+    // Find matching categories by slug
+    let categoryIds: unknown[] = [];
+    if (categories.length > 0) {
+        const cats = await Category.find({ slug: { $in: categories }, isActive: true }).lean();
+        categoryIds = cats.map(c => c._id);
+        if (categoryIds.length > 0) {
+            orConditions.push({ categoryId: { $in: categoryIds } });
+        }
+    }
+
+    if (orConditions.length === 0) return [];
+
+    const products = await Product.find({
+        isActive: true,
+        $or: orConditions,
+    })
+        .populate('brandId', 'name slug')
+        .populate('categoryId', 'name slug')
+        .limit(20)
+        .lean();
+
+    // Score and rank results
+    const scored = products.map(p => {
+        let score = 0;
+        const name = (p.name || '').toLowerCase();
+        const desc = (p.shortDescription || '').toLowerCase();
+        const query = originalQuery.toLowerCase();
+
+        // Exact name match = highest score
+        if (name === query) score += 100;
+        // Name starts with query
+        else if (name.startsWith(query)) score += 80;
+        // Name contains query
+        else if (name.includes(query)) score += 60;
+        // Description contains query
+        if (desc.includes(query)) score += 30;
+
+        // Keyword matches in name
+        for (const kw of keywords) {
+            if (name.includes(kw.toLowerCase())) score += 20;
+        }
+
+        // Category match bonus
+        if (categoryIds.length > 0 && p.categoryId) {
+            const catId = typeof p.categoryId === 'object' && p.categoryId !== null
+                ? String((p.categoryId as unknown as { _id?: unknown })._id || p.categoryId)
+                : String(p.categoryId);
+            if (categoryIds.some(id => String(id) === catId)) score += 25;
+        }
+
+        // Concern match bonus
+        if (p.concerns && concerns.length > 0) {
+            for (const c of concerns) {
+                if (p.concerns.some((pc: string) => pc.toLowerCase().includes(c.toLowerCase()))) {
+                    score += 15;
+                }
+            }
+        }
+
+        // Featured / rating bonus
+        if (p.isFeatured) score += 10;
+        score += (p.ratingAvg || 0) * 2;
+
+        return { product: p, score };
     });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    return attachCouponsToCards(scored.map(({ product: p }) => {
+        const brand = p.brandId as Record<string, unknown> | null;
+        const category = p.categoryId as Record<string, unknown> | null;
+        return toProductCard(p as unknown as Record<string, unknown>, brand, category);
+    }));
 }
 
 // ============================================================================
@@ -702,11 +841,11 @@ export async function getWishlistProducts(userId: string): Promise<ProductCard[]
         .populate('categoryId', 'name slug')
         .lean();
 
-    return products.map(p => {
+    return attachCouponsToCards(products.map(p => {
         const brand = p.brandId as Record<string, unknown> | null;
         const category = p.categoryId as Record<string, unknown> | null;
         return toProductCard(p as unknown as Record<string, unknown>, brand, category);
-    });
+    }));
 }
 
 // ============================================================================
@@ -721,7 +860,7 @@ export async function getProductReviews(productId: string): Promise<ReviewData[]
 
     const result: ReviewData[] = [];
     for (const review of reviews) {
-        const user = await User.findById(review.userId).select('displayName fullName').lean();
+        const user = await User.findOne({ clerkId: review.userId }).select('displayName fullName').lean();
         result.push({
             id: String(review._id),
             product_id: String(review.productId),
@@ -750,10 +889,10 @@ export async function submitReview(data: {
     title: string;
     body: string;
     images?: { url: string; altText?: string | null; sortOrder?: number }[];
-}): Promise<{ error: string | null }> {
+}): Promise<{ error: string | null; reviewId?: string }> {
     await connectToDatabase();
     try {
-        await Review.create({
+        const createdReview = await Review.create({
             productId: data.product_id,
             userId: data.user_id,
             rating: data.rating,
@@ -775,10 +914,90 @@ export async function submitReview(data: {
             ratingAvg,
         });
 
-        return { error: null };
+        return { error: null, reviewId: String(createdReview._id) };
     } catch (err) {
         console.error('Error submitting review:', err);
         return { error: err instanceof Error ? err.message : 'Failed' };
+    }
+}
+
+export async function deleteReview({
+    reviewId,
+    userId,
+}: {
+    reviewId: string;
+    userId: string;
+}): Promise<{ error: string | null }> {
+    await connectToDatabase();
+    try {
+        const review = await Review.findById(reviewId);
+        if (!review) {
+            return { error: 'Review not found' };
+        }
+        if (review.userId !== userId) {
+            return { error: 'Unauthorized' };
+        }
+
+        const productId = review.productId;
+        await Review.findByIdAndDelete(reviewId);
+
+        // Recalculate average rating and review count
+        const approvedReviews = await Review.find({ productId, isApproved: true }).lean();
+        const reviewCount = approvedReviews.length;
+        const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+        const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;
+
+        await Product.findByIdAndUpdate(productId, {
+            reviewCount,
+            ratingAvg,
+        });
+
+        return { error: null };
+    } catch (err) {
+        console.error('Error deleting review:', err);
+        return { error: err instanceof Error ? err.message : 'Failed to delete review' };
+    }
+}
+
+export async function updateReview(data: {
+    reviewId: string;
+    userId: string;
+    rating: number;
+    title: string;
+    body: string;
+}): Promise<{ error: string | null }> {
+    await connectToDatabase();
+    try {
+        const review = await Review.findById(data.reviewId);
+        if (!review) {
+            return { error: 'Review not found' };
+        }
+        if (review.userId !== data.userId) {
+            return { error: 'Unauthorized' };
+        }
+
+        review.rating = data.rating;
+        review.title = data.title || null;
+        review.body = data.body || null;
+        await review.save();
+
+        const productId = review.productId;
+
+        // Recalculate average rating and review count
+        const approvedReviews = await Review.find({ productId, isApproved: true }).lean();
+        const reviewCount = approvedReviews.length;
+        const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+        const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;
+
+        await Product.findByIdAndUpdate(productId, {
+            reviewCount,
+            ratingAvg,
+        });
+
+        return { error: null };
+    } catch (err) {
+        console.error('Error updating review:', err);
+        return { error: err instanceof Error ? err.message : 'Failed to update review' };
     }
 }
 

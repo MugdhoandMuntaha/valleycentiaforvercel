@@ -595,8 +595,8 @@ export default function ProfilePage() {
                                                 {/* Rating */}
                                                 {product.rating_avg > 0 && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                                                        <Star size={11} fill="#e67e22" stroke="#e67e22" />
-                                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#e67e22' }}>{product.rating_avg}</span>
+                                                        <Star size={11} fill="#ffb700" stroke="#ffb700" />
+                                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#ffb700' }}>{product.rating_avg}</span>
                                                         <span style={{ fontSize: 10, color: '#bbb' }}>({product.review_count})</span>
                                                     </div>
                                                 )}
@@ -634,7 +634,7 @@ export default function ProfilePage() {
                                                             textTransform: 'uppercase', letterSpacing: 0.3,
                                                         }}
                                                     >
-                                                        <ShoppingBag size={12} /> Add to Cart
+                                                        Add to Cart
                                                     </button>
                                                     <button
                                                         onClick={() => toggleWishlist(product.id)}
