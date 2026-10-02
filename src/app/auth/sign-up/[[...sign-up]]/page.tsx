@@ -13,6 +13,9 @@ export default function SignUpPage() {
             padding: '48px 24px',
         }}>
             <SignUp
+                routing="path"
+                path="/auth/sign-up"
+                signInUrl="/auth/sign-in"
                 appearance={{
                     elements: {
                         rootBox: {
