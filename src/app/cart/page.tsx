@@ -29,7 +29,6 @@ function toSectionProduct(p: ProductCardType): SectionProduct {
     const badges = p.badges as { badge: string; label: string | null; color: string | null }[] | null;
     const primaryBadge = badges?.find((b) => b.label) || badges?.[0];
     const badgeText = primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined;
-    const isPremium = badgeText?.toLowerCase() === 'premium';
     const formatReviewCount = (count: number) => count >= 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
 
     return {
@@ -44,7 +43,7 @@ function toSectionProduct(p: ProductCardType): SectionProduct {
         rating: Number(p.rating_avg),
         reviewCount: formatReviewCount(Number(p.review_count) || 0),
         badge: badgeText,
-        badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
+        badgeColor: primaryBadge?.color || undefined,
         inStock: p.in_stock !== undefined ? p.in_stock : true,
         stockQuantity: p.stock_quantity !== undefined ? p.stock_quantity : 0,
         sizes: p.sizes || null,

@@ -9,8 +9,8 @@ import type { SectionProduct } from '@/data/homeSections';
 function toSectionProduct(p: SectionProductCard): SectionProduct {
   const badges = p.badges as { badge: string; label: string | null; color: string | null }[] | null;
   const primaryBadge = badges?.find((b) => b.label) || badges?.[0];
-  const badgeText = primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined;
-  const isPremium = badgeText?.toLowerCase() === 'premium';
+  const badgeText = p.custom_badge_text || (primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined);
+  const badgeColor = p.custom_badge_color || primaryBadge?.color || undefined;
   return {
     id: p.id,
     slug: (p.slug as string) || '',
@@ -25,7 +25,7 @@ function toSectionProduct(p: SectionProductCard): SectionProduct {
     rating: Number(p.rating_avg) || 0,
     reviewCount: formatReviewCount(Number(p.review_count) || 0),
     badge: badgeText,
-    badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
+    badgeColor,
     inStock: p.in_stock !== undefined ? p.in_stock : true,
     stockQuantity: p.stock_quantity !== undefined ? p.stock_quantity : 0,
     sizes: p.sizes || null,

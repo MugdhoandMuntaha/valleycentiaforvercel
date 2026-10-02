@@ -305,6 +305,12 @@ export async function updateStockForOrder(
     return prod.updateStockForOrder(orderItems);
 }
 
+export async function restoreStockForOrder(
+    orderItems: { productId: any; sizeLabel?: string | null; quantity: number }[]
+): Promise<void> {
+    return prod.restoreStockForOrder(orderItems);
+}
+
 export async function getProductPageData(slug: string) {
     return prod.getProductPageData(slug);
 }
@@ -377,6 +383,13 @@ export async function getUserOrders(userId: string): Promise<UserOrder[]> {
 
 export async function getUserOrderCount(userId: string): Promise<number> {
     return ord.getUserOrderCount(userId);
+}
+
+export async function getOrderByOrderNumber(
+    orderNumber: string,
+    accessCheck?: { userId?: string | null; phone?: string | null }
+): Promise<UserOrder | null> {
+    return ord.getOrderByOrderNumber(orderNumber, accessCheck);
 }
 
 // Coupons

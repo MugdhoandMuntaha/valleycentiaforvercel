@@ -1,54 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
-import Order from '@/lib/models/Order';
-import CartItem from '@/lib/models/CartItem';
-import { updateStockForOrder } from '@/lib/db/queries';
+import { OrderService } from '@/lib/services/order.service';
 
+/**
+ * Controller: SSLCommerz Payment Success & IPN Webhook Handler
+ * 
+ * HTTP Transport layer delegating validation, idempotency guard,
+ * inventory decrement, and background events to OrderService.
+ */
 export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
         const tran_id = formData.get('tran_id') as string;
-        const val_id = formData.get('val_id') as string;
-        const status = formData.get('status') as string;
+        const val_id = (formData.get('val_id') as string) || null;
+        const status = (formData.get('status') as string) || '';
 
         if (!tran_id) {
             return NextResponse.redirect(new URL('/checkout/fail', req.url));
         }
 
-        await connectToDatabase();
+        const result = await OrderService.confirmOnlinePayment({
+            tran_id,
+            val_id,
+            status,
+        });
 
-        if (status === 'VALID' || status === 'VALIDATED') {
-            let order = await Order.findOneAndUpdate(
-                { transactionId: tran_id, status: 'pending' },
-                {
-                    status: 'confirmed',
-                    paymentStatus: 'captured',
-                    sslValId: val_id || null,
-                    $push: { statusHistory: { status: 'confirmed', note: 'Payment validated by SSLCommerz' } }
-                },
-                { new: true }
-            );
-
-            if (order) {
-                // Order is confirmed for the first time -> update stock
-                await updateStockForOrder(order.orderItems);
-                if (order.userId) {
-                    await CartItem.deleteMany({ userId: order.userId });
-                }
-            } else {
-                // Already confirmed (e.g. via IPN/success overlap) -> fetch it
-                order = await Order.findOne({ transactionId: tran_id });
-            }
-
-            const orderNumber = order?.orderNumber || '';
+        if (result.success && result.orderNumber) {
             return NextResponse.redirect(
-                new URL(`/checkout/success?order=${orderNumber}`, req.url)
+                new URL(`/checkout/success?order=${encodeURIComponent(result.orderNumber)}`, req.url)
             );
         }
 
         return NextResponse.redirect(new URL('/checkout/fail', req.url));
     } catch (err) {
-        console.error('Payment success callback error:', err);
+        console.error('[PaymentSuccessControllerError]', err);
         return NextResponse.redirect(new URL('/checkout/fail', req.url));
     }
 }

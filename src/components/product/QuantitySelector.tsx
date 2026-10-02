@@ -35,6 +35,7 @@ export default function QuantitySelector({ quantity, onChange, min = 1 }: Quanti
                 }}
             >
                 <button
+                    type="button"
                     onClick={() => onChange(Math.max(min, quantity - 1))}
                     disabled={quantity <= min}
                     style={{
@@ -73,6 +74,7 @@ export default function QuantitySelector({ quantity, onChange, min = 1 }: Quanti
                     {quantity}
                 </span>
                 <button
+                    type="button"
                     onClick={() => onChange(quantity + 1)}
                     style={{
                         width: '36px',

@@ -37,6 +37,7 @@ import { useWishlist } from '@/lib/WishlistContext';
 import { useAuth } from '@/lib/AuthContext';
 import { ProductDetailSkeleton } from '@/components/Skeletons';
 import ProductCard from '@/components/ProductCard';
+import ProductBadge from '@/components/common/ProductBadge';
 import type { SectionProduct } from '@/data/homeSections';
 
 /* ===== Local Display Types (matches existing UI) ===== */
@@ -436,23 +437,15 @@ function ImageGallery({ images, title, badges }: { images: string[]; title: stri
 
                     {/* Badges */}
                     {badges.length > 0 && (
-                        <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', gap: '6px', zIndex: 2 }}>
-                            {badges.map((b, i) => {
-                                const bg = b.color || '#f0c14b';
-                                const isLight = isLightColor(bg);
-                                return (
-                                    <span key={i} style={{
-                                        background: bg,
-                                        color: isLight ? '#fff' : '#ffffff',
-                                        fontSize: '11px', fontWeight: 700, padding: '5px 14px',
-                                        borderRadius: '6px', fontFamily: "'Inter', sans-serif",
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                                        letterSpacing: '0.3px',
-                                    }}>
-                                        {b.text}
-                                    </span>
-                                );
-                            })}
+                        <div style={{ position: 'absolute', top: '14px', left: '14px', display: 'flex', flexDirection: 'column', gap: '6px', zIndex: 2 }}>
+                            {badges.map((b, i) => (
+                                <ProductBadge
+                                    key={i}
+                                    badge={b.text}
+                                    badgeColor={b.color}
+                                    variant="gallery"
+                                />
+                            ))}
                         </div>
                     )}
 
@@ -1768,7 +1761,6 @@ function ReviewsSection({
 function toSectionProductFromDetail(p: ProductDetail): SectionProduct {
     const primaryBadge = p.badges?.[0];
     const badgeText = primaryBadge?.text;
-    const isPremium = badgeText?.toLowerCase() === 'premium';
 
     return {
         id: p.id,
@@ -1782,7 +1774,7 @@ function toSectionProductFromDetail(p: ProductDetail): SectionProduct {
         rating: p.rating,
         reviewCount: p.reviewCount,
         badge: badgeText,
-        badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
+        badgeColor: primaryBadge?.color || undefined,
         inStock: p.inStock,
         stockQuantity: p.stockQuantity,
         sizes: p.sizes ? p.sizes.map((sz, idx) => ({

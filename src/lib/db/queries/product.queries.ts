@@ -15,7 +15,7 @@ import type { ProductCard, ProductDetail, ProductFilters, AISearchParams } from 
 export async function getProductCards(filters?: ProductFilters): Promise<ProductCard[]> {
     await connectToDatabase();
 
-    const query: Record<string, unknown> = { isActive: true };
+    const query: Record<string, unknown> = { isActive: true, isDeleted: { $ne: true } };
 
     if (filters?.brand) {
         const brand = await Brand.findOne({ slug: filters.brand }).lean();
@@ -38,17 +38,36 @@ export async function getProductCards(filters?: ProductFilters): Promise<Product
         query.name = { $regex: filters.search, $options: 'i' };
     }
 
+    if (filters?.minPrice !== undefined || filters?.maxPrice !== undefined) {
+        const priceFilter: Record<string, number> = {};
+        if (filters.minPrice !== undefined) priceFilter.$gte = Number(filters.minPrice);
+        if (filters.maxPrice !== undefined) priceFilter.$lte = Number(filters.maxPrice);
+        query.basePrice = priceFilter;
+    }
+
+    if (filters?.inStockOnly) {
+        query.inStock = true;
+        query.stockQuantity = { $gt: 0 };
+    }
+
     let sortObj: Record<string, 1 | -1> = { isFeatured: -1, ratingAvg: -1 };
     if (filters?.sort === 'price-low') sortObj = { basePrice: 1 };
     else if (filters?.sort === 'price-high') sortObj = { basePrice: -1 };
     else if (filters?.sort === 'top-rated') sortObj = { ratingAvg: -1 };
     else if (filters?.sort === 'newest') sortObj = { createdAt: -1 };
 
-    const products = await Product.find(query)
+    let cursor = Product.find(query)
         .populate('brandId', 'name slug')
         .populate('categoryId', 'name slug')
-        .sort(sortObj)
-        .lean();
+        .sort(sortObj);
+
+    if (filters?.limit) {
+        const page = Math.max(1, Number(filters.page) || 1);
+        const limit = Math.max(1, Number(filters.limit));
+        cursor = cursor.skip((page - 1) * limit).limit(limit);
+    }
+
+    const products = await cursor.lean();
 
     return attachCouponsToCards(mapProductsToCards(products as unknown as Record<string, unknown>[]));
 }
@@ -60,7 +79,7 @@ export async function getProductCards(filters?: ProductFilters): Promise<Product
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
     await connectToDatabase();
 
-    const product = await Product.findOne({ slug })
+    const product = await Product.findOne({ slug, isDeleted: { $ne: true } })
         .populate('brandId', 'name slug')
         .populate('categoryId', 'name slug')
         .lean();
@@ -140,7 +159,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
 export async function getRelatedProducts(slug: string, limit: number = 4): Promise<ProductCard[]> {
     await connectToDatabase();
-    const products = await Product.find({ slug: { $ne: slug }, isActive: true })
+    const products = await Product.find({ slug: { $ne: slug }, isActive: true, isDeleted: { $ne: true } })
         .populate('brandId', 'name slug')
         .populate('categoryId', 'name slug')
         .sort({ ratingAvg: -1 })
@@ -158,21 +177,39 @@ export async function getRelatedProductsSimple(currentSlug: string, limit: numbe
 // SEARCH PRODUCTS
 // ============================================================================
 
-export async function searchProducts(query: string): Promise<ProductCard[]> {
+export async function searchProducts(query: string, limit: number = 10): Promise<ProductCard[]> {
     if (!query.trim()) return [];
     await connectToDatabase();
 
+    const terms = query.trim().split(/\s+/).filter(Boolean);
+    const escapedTerms = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const escapedFull = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const orConditions: Record<string, unknown>[] = [
+        { name: { $regex: escapedFull, $options: 'i' } },
+        { shortDescription: { $regex: escapedFull, $options: 'i' } },
+        { subtitle: { $regex: escapedFull, $options: 'i' } },
+        { tags: { $regex: escapedFull, $options: 'i' } },
+    ];
+
+    for (const term of escapedTerms) {
+        orConditions.push(
+            { name: { $regex: term, $options: 'i' } },
+            { shortDescription: { $regex: term, $options: 'i' } },
+            { subtitle: { $regex: term, $options: 'i' } },
+            { tags: { $regex: term, $options: 'i' } },
+        );
+    }
+
     const products = await Product.find({
         isActive: true,
-        $or: [
-            { name: { $regex: query, $options: 'i' } },
-            { shortDescription: { $regex: query, $options: 'i' } },
-        ],
+        isDeleted: { $ne: true },
+        $or: orConditions,
     })
         .populate('brandId', 'name slug')
         .populate('categoryId', 'name slug')
-        .sort({ ratingAvg: -1 })
-        .limit(10)
+        .sort({ ratingAvg: -1, isFeatured: -1 })
+        .limit(limit)
         .lean();
 
     return attachCouponsToCards(mapProductsToCards(products as unknown as Record<string, unknown>[]));
@@ -219,6 +256,7 @@ export async function aiSearchProducts(params: AISearchParams): Promise<ProductC
 
     const products = await Product.find({
         isActive: true,
+        isDeleted: { $ne: true },
         $or: orConditions,
     })
         .populate('brandId', 'name slug')
@@ -280,7 +318,58 @@ export async function updateStockForOrder(orderItems: { productId: import('mongo
     await connectToDatabase();
     for (const item of orderItems) {
         const productId = item.productId;
-        const quantity = item.quantity;
+        const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+        const sizeLabel = item.sizeLabel;
+
+        if (sizeLabel) {
+            // Atomic update on variant stock with non-negative guard
+            const res = await Product.updateOne(
+                { _id: productId, "sizes.label": sizeLabel, "sizes.stockQuantity": { $gte: quantity } },
+                {
+                    $inc: {
+                        stockQuantity: -quantity,
+                        "sizes.$.stockQuantity": -quantity,
+                    }
+                }
+            );
+
+            // Fallback if size-level stock was not separately capped
+            if (res.matchedCount === 0) {
+                await Product.updateOne(
+                    { _id: productId, stockQuantity: { $gte: quantity } },
+                    {
+                        $inc: { stockQuantity: -quantity },
+                    }
+                );
+            }
+        } else {
+            // Atomic update on product stock with non-negative guard
+            await Product.updateOne(
+                { _id: productId, stockQuantity: { $gte: quantity } },
+                {
+                    $inc: { stockQuantity: -quantity },
+                }
+            );
+        }
+
+        // Auto-update inStock status if depleted
+        await Product.updateOne(
+            { _id: productId, stockQuantity: { $lte: 0 } },
+            { $set: { inStock: false, stockQuantity: 0 } }
+        );
+    }
+}
+
+/**
+ * Atomically restore stock quantities when an order is cancelled or payment fails
+ */
+export async function restoreStockForOrder(
+    orderItems: Array<{ productId: any; quantity: number; sizeLabel?: string | null }>
+): Promise<void> {
+    await connectToDatabase();
+    for (const item of orderItems) {
+        const productId = item.productId;
+        const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
         const sizeLabel = item.sizeLabel;
 
         if (sizeLabel) {
@@ -288,24 +377,21 @@ export async function updateStockForOrder(orderItems: { productId: import('mongo
                 { _id: productId, "sizes.label": sizeLabel },
                 {
                     $inc: {
-                        stockQuantity: -quantity,
-                        "sizes.$.stockQuantity": -quantity
-                    }
+                        stockQuantity: quantity,
+                        "sizes.$.stockQuantity": quantity,
+                    },
+                    $set: { inStock: true }
                 }
             );
         } else {
             await Product.updateOne(
                 { _id: productId },
                 {
-                    $inc: { stockQuantity: -quantity }
+                    $inc: { stockQuantity: quantity },
+                    $set: { inStock: true }
                 }
             );
         }
-
-        await Product.updateOne(
-            { _id: productId, stockQuantity: { $lte: 0 } },
-            { $set: { inStock: false } }
-        );
     }
 }
 

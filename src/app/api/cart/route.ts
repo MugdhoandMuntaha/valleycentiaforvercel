@@ -20,6 +20,7 @@ export async function GET() {
         const items = dbItems.map((item: any) => {
             if (!item.productId) return null;
             const prod = item.productId;
+            if (prod.isDeleted) return null;
 
             let price = prod.basePrice;
             let originalPrice = prod.compareAtPrice || undefined;
@@ -41,6 +42,8 @@ export async function GET() {
                 primaryImg = primary.url;
             }
 
+            const effectiveQty = Math.max(1, Math.min(item.quantity, stockQuantity > 0 ? stockQuantity : 10));
+
             return {
                 id: String(prod._id),
                 slug: prod.slug,
@@ -49,7 +52,7 @@ export async function GET() {
                 price: Math.ceil(price),
                 originalPrice: originalPrice ? Math.ceil(originalPrice) : undefined,
                 size: sizeLabel,
-                quantity: item.quantity,
+                quantity: effectiveQty,
                 stockQuantity: stockQuantity,
             };
         }).filter(Boolean);
@@ -68,7 +71,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
-
         const body = await req.json();
         const clientItems = body.items || [];
 
@@ -80,22 +82,26 @@ export async function POST(req: NextRequest) {
         // Map and insert new ones
         const toInsert = [];
         for (const item of clientItems) {
-            const prod = await Product.findById(item.id).lean();
+            const prod = await Product.findOne({ _id: item.id, isDeleted: { $ne: true } }).lean();
             if (!prod) continue;
 
             let sizeId = null;
+            let availableStock = prod.stockQuantity || 0;
             if (item.size && prod.sizes) {
                 const sz = prod.sizes.find((s: any) => s.label === item.size);
                 if (sz) {
                     sizeId = sz._id;
+                    availableStock = sz.stockQuantity || 0;
                 }
             }
+
+            const validQty = Math.max(1, Math.min(Number(item.quantity) || 1, availableStock > 0 ? availableStock : 10, 10));
 
             toInsert.push({
                 userId,
                 productId: prod._id,
                 sizeId,
-                quantity: item.quantity,
+                quantity: validQty,
             });
         }
 
@@ -103,7 +109,7 @@ export async function POST(req: NextRequest) {
             await CartItem.insertMany(toInsert);
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, count: toInsert.length });
     } catch (err) {
         console.error('Save cart error:', err);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

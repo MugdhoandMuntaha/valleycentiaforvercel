@@ -1,94 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import connectToDatabase from '@/lib/mongodb';
-import Order from '@/lib/models/Order';
-import CartItem from '@/lib/models/CartItem';
-import { updateStockForOrder } from '@/lib/db/queries';
+import { OrderService } from '@/lib/services/order.service';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { sanitizeNoSql } from '@/lib/sanitize';
 
-function generateOrderNumber() {
-    const now = new Date();
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const random6 = Math.floor(100000 + Math.random() * 900000);
-    return `VC-${day}${month}-${random6}`;
-}
-
+/**
+ * REST Endpoint: POST /api/payment/cod
+ * 
+ * Production protections:
+ * - Rate limiting (max 10 checkout orders per minute per IP)
+ * - NoSQL injection sanitization
+ * - Idempotency via 'Idempotency-Key' header or body
+ * - Server-side canonical price re-validation via OrderService
+ */
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        const { userId, items, address, subtotal, shipping, tax, total } = body;
+        // 1. Rate Limiting Protection
+        const clientIp = getClientIp(req);
+        const rateCheck = checkRateLimit(`cod_${clientIp}`, 10, 60000);
+        if (!rateCheck.success) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please wait a moment before trying again.' },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateCheck.reset - Date.now()) / 1000)),
+                        'X-RateLimit-Limit': String(rateCheck.limit),
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
+            );
+        }
+
+        // 2. Parse & Sanitize Input
+        const rawBody = await req.json();
+        const body = sanitizeNoSql(rawBody);
+        const { userId, email, items, address, shipping, couponCode } = body;
 
         const isGuest = !userId || userId === 'guest';
 
-        if ((!userId && !isGuest) || !items?.length || !address || !total) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        if ((!userId && !isGuest) || !items?.length || !address) {
+            return NextResponse.json({ error: 'Missing required delivery or item fields' }, { status: 400 });
         }
 
-        await connectToDatabase();
-        const orderNumber = generateOrderNumber();
+        const idempotencyKey = req.headers.get('idempotency-key') || body.idempotencyKey || null;
 
-        const orderItems = items.map((item: { id: string; name: string; image: string; slug: string; size?: string; quantity: number; price: number }) => ({
-            productId: new mongoose.Types.ObjectId(item.id),
-            productName: item.name,
-            productImage: item.image,
-            productSlug: item.slug,
-            sizeLabel: item.size || null,
-            unitPrice: item.price,
-            quantity: item.quantity,
-            totalPrice: item.price * item.quantity,
-        }));
-
-        // Create COD order in DB
-        const order = await Order.create({
-            userId: isGuest ? null : userId,
-            orderNumber: orderNumber,
-            shippingName: address.full_name,
-            shippingPhone: address.phone,
-            shippingAddressLine1: address.address_line_1,
-            shippingAddressLine2: address.address_line_2 || null,
-            shippingCity: address.city,
-            shippingState: address.state,
-            shippingPostalCode: address.postal_code,
-            shippingCountry: address.country || 'Bangladesh',
-            subtotal,
-            shippingCost: shipping,
-            tax,
-            total,
-            status: 'confirmed',
-            paymentStatus: 'pending',
-            paymentMethod: 'cod',
-            orderItems,
-            statusHistory: [{ status: 'confirmed', note: 'COD order confirmed' }],
-        });
-
-        if (!order) {
-            return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
-        }
-
-        // Update stock quantities
-        await updateStockForOrder(orderItems);
-
-        // Clear existing cart items in database
-        if (!isGuest && userId) {
-            await CartItem.deleteMany({ userId });
-        }
-
-        return NextResponse.json({
-            success: true,
-            orderNumber,
-            orderId: order._id,
-            items: items.map((i: { name: string; quantity: number; price: number; size?: string }) => ({
-                name: i.name,
-                quantity: i.quantity,
-                price: i.price,
-                size: i.size,
-            })),
+        // 3. Delegate to Domain Service
+        const result = await OrderService.createCodOrder({
+            userId,
+            email,
+            items,
             address,
-            subtotal,
             shipping,
-            tax,
-            total,
+            couponCode,
+            idempotencyKey,
         });
+
+        return NextResponse.json(result);
     } catch (err) {
         console.error('COD order error:', err);
         return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 });

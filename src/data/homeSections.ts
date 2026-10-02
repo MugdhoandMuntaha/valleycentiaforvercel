@@ -230,7 +230,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.58,
         reviewCount: '117',
         badge: 'Selling Fast',
-        badgeColor: '#2e7d32',
+        badgeColor: '#000000',
     },
     {
         id: '2',
@@ -246,7 +246,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.65,
         reviewCount: '118',
         badge: 'Selling Fast',
-        badgeColor: '#2e7d32',
+        badgeColor: '#000000',
     },
     {
         id: '3',
@@ -262,7 +262,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.67,
         reviewCount: '2.9K',
         badge: 'Best Seller',
-        badgeColor: '#2e7d32',
+        badgeColor: '#000000',
     },
     {
         id: '4',
@@ -278,7 +278,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.91,
         reviewCount: '520',
         badge: 'Trending',
-        badgeColor: '#00897b',
+        badgeColor: '#000000',
     },
     {
         id: '5',
@@ -294,7 +294,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.73,
         reviewCount: '340',
         badge: 'Selling Fast',
-        badgeColor: '#2e7d32',
+        badgeColor: '#000000',
     },
     {
         id: '6',
@@ -310,6 +310,6 @@ export const powerCareDuoProducts: SectionProduct[] = [
         rating: 4.60,
         reviewCount: '205',
         badge: 'Trending',
-        badgeColor: '#00897b',
+        badgeColor: '#000000',
     },
 ];

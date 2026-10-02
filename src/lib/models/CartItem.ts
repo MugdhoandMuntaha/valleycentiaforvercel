@@ -21,6 +21,7 @@ const CartItemSchema = new Schema<ICartItem>(
 
 CartItemSchema.index({ userId: 1 });
 CartItemSchema.index({ userId: 1, productId: 1, sizeId: 1 }, { unique: true });
+CartItemSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 const CartItem: Model<ICartItem> = mongoose.models.CartItem || mongoose.model<ICartItem>('CartItem', CartItemSchema);
 export default CartItem;

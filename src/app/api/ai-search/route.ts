@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { aiSearchProducts } from '@/lib/db/queries';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 // ── In-memory LRU cache ──────────────────────────────────────────────────
 const cache = new Map<string, { data: unknown; ts: number }>();
@@ -116,6 +117,20 @@ async function expandQueryWithAI(query: string): Promise<AIExpansion | null> {
 // ── API Route ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
     try {
+        const clientIp = getClientIp(req);
+        const rateCheck = checkRateLimit(`ai_${clientIp}`, 30, 60000);
+        if (!rateCheck.success) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Please wait a minute before making more AI search queries.', products: [], aiEnhanced: false },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateCheck.reset - Date.now()) / 1000)),
+                    },
+                }
+            );
+        }
+
         const body = await req.json();
         const query = (body.query as string || '').trim();
 

@@ -93,6 +93,7 @@ export default function SizeSelectionModal({
                 >
                     {/* Close Button */}
                     <button
+                        type="button"
                         onClick={onClose}
                         style={{
                             position: 'absolute',
@@ -240,6 +241,7 @@ export default function SizeSelectionModal({
 
                                     return (
                                         <button
+                                            type="button"
                                             key={sz.id}
                                             onClick={() => onSelectSize(sz)}
                                             style={{
@@ -293,6 +295,7 @@ export default function SizeSelectionModal({
 
                     {/* Confirm Button */}
                     <button
+                        type="button"
                         disabled={isOutOfStock}
                         onClick={onConfirm}
                         style={{

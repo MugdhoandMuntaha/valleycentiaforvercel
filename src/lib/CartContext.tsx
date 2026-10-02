@@ -33,6 +33,9 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+import { getCartItemKey, mergeCartItems } from '@/lib/cartUtils';
+export { getCartItemKey };
+
 /* ===== Cart Sync Hook (SRP: DB sync logic extracted) ===== */
 function useCartSync(
     items: CartItem[],
@@ -42,7 +45,7 @@ function useCartSync(
 ) {
     const hasSyncedInit = useRef(false);
 
-    // Load/merge from database when user logs in
+    // Load/merge from database when user logs in (Bidirectional Guest Cart Migration)
     useEffect(() => {
         if (!isHydrated) return;
 
@@ -52,15 +55,24 @@ function useCartSync(
                     const res = await fetch('/api/cart');
                     if (res.ok) {
                         const data = await res.json();
-                        const dbItems = data.items || [];
+                        const dbItems: CartItem[] = data.items || [];
                         
                         if (dbItems.length > 0 && items.length === 0) {
                             setItems(dbItems);
-                        } else if (items.length > 0) {
+                        } else if (items.length > 0 && dbItems.length === 0) {
                             await fetch('/api/cart', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ items }),
+                            });
+                        } else if (items.length > 0 && dbItems.length > 0) {
+                            // Union and merge guest cart with user cart from database
+                            const merged = mergeCartItems(dbItems, items);
+                            setItems(merged);
+                            await fetch('/api/cart', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ items: merged }),
                             });
                         }
                     }
@@ -119,6 +131,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setIsHydrated(true);
     }, []);
 
+    // Cross-tab synchronization via storage event
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'valleycentia-cart' && e.newValue) {
+                try {
+                    const parsed = JSON.parse(e.newValue);
+                    if (Array.isArray(parsed)) {
+                        setItems(parsed);
+                    }
+                } catch {
+                    // ignore parse error
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
     // DB sync (extracted into hook for SRP)
     useCartSync(items, isHydrated, user, setItems);
 
@@ -129,8 +160,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [items, isHydrated]);
 
-    /** Generate a unique key for cart item (handles size variants) */
-    const itemKey = (id: string, size?: string) => size ? `${id}-${size}` : id;
+    const itemKey = getCartItemKey;
 
     const addToCart = useCallback((item: Omit<CartItem, 'quantity'>, quantity = 1) => {
         const roundedItem = {

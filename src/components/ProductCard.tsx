@@ -9,6 +9,7 @@ import type { SectionProduct } from '@/data/homeSections';
 import { useCart } from '@/lib/CartContext';
 import { useWishlist } from '@/lib/WishlistContext';
 import SizeSelectionModal, { type ProductSize } from '@/components/product/SizeSelectionModal';
+import ProductBadge from '@/components/common/ProductBadge';
 
 interface ProductCardProps {
     product: SectionProduct;
@@ -143,31 +144,17 @@ export default function ProductCard({
                 >
                     {/* Top-left Badge */}
                     {product.badge && (
-                        <span
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                background: '#000000',
-                                color: '#ffffff',
-                                fontFamily: "'Inter', sans-serif",
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                padding: '4px 10px',
-                                borderRadius: '12px 0 6px 0',
-                                letterSpacing: '0.5px',
-                                lineHeight: '1.2',
-                                textTransform: 'uppercase',
-                                zIndex: 3,
-                            }}
-                        >
-                            {product.badge.replace(/_/g, ' ')}
-                        </span>
+                        <ProductBadge
+                            badge={product.badge}
+                            badgeColor={product.badgeColor}
+                            variant="card"
+                        />
                     )}
 
                     {/* Wishlist Heart (Optional) */}
                     {showWishlist && (
                         <button
+                            type="button"
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -383,6 +370,7 @@ export default function ProductCard({
 
                             {/* Add to Cart */}
                             <button
+                                type="button"
                                 className="card-add-btn"
                                 disabled={product.inStock === false}
                                 onClick={handleAddToCartClick}

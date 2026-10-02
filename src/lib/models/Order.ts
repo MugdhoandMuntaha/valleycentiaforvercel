@@ -10,10 +10,10 @@ const OrderItemSchema = new Schema(
         productSlug: { type: String, default: null },
         sizeLabel: { type: String, default: null },
         sizeId: { type: Schema.Types.ObjectId, default: null },
-        unitPrice: { type: Number, required: true },
+        unitPrice: { type: Number, required: true, min: 0 },
         originalPrice: { type: Number, default: null },
         quantity: { type: Number, required: true, min: 1 },
-        totalPrice: { type: Number, required: true },
+        totalPrice: { type: Number, required: true, min: 0 },
     },
     { _id: true, timestamps: false }
 );
@@ -94,6 +94,9 @@ export interface IOrder extends Document {
     transactionId: string | null;
     sslSessionKey: string | null;
     sslValId: string | null;
+    idempotencyKey?: string | null;
+    isDeleted?: boolean;
+    deletedAt?: Date | null;
 
     orderItems: IOrderItem[];
     statusHistory: IStatusHistory[];
@@ -121,11 +124,11 @@ const OrderSchema = new Schema<IOrder>(
             enum: ['credit_card', 'debit_card', 'upi', 'net_banking', 'wallet', 'cod', 'emi', null],
             default: null,
         },
-        subtotal: { type: Number, required: true, default: 0 },
-        discountAmount: { type: Number, default: 0 },
-        shippingCost: { type: Number, default: 0 },
-        tax: { type: Number, default: 0 },
-        total: { type: Number, required: true, default: 0 },
+        subtotal: { type: Number, required: true, default: 0, min: 0 },
+        discountAmount: { type: Number, default: 0, min: 0 },
+        shippingCost: { type: Number, default: 0, min: 0 },
+        tax: { type: Number, default: 0, min: 0 },
+        total: { type: Number, required: true, default: 0, min: 0 },
         couponId: { type: Schema.Types.ObjectId, ref: 'Coupon', default: null },
         couponCode: { type: String, default: null },
         currency: { type: String, default: 'BDT' },
@@ -158,6 +161,9 @@ const OrderSchema = new Schema<IOrder>(
         transactionId: { type: String, default: null },
         sslSessionKey: { type: String, default: null },
         sslValId: { type: String, default: null },
+        idempotencyKey: { type: String, default: null, sparse: true, index: true },
+        isDeleted: { type: Boolean, default: false, index: true },
+        deletedAt: { type: Date, default: null },
 
         orderItems: [OrderItemSchema],
         statusHistory: [StatusHistorySchema],
@@ -166,8 +172,9 @@ const OrderSchema = new Schema<IOrder>(
 );
 
 OrderSchema.index({ userId: 1 });
-
+OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
+OrderSchema.index({ isDeleted: 1, status: 1 });
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ transactionId: 1 });
 

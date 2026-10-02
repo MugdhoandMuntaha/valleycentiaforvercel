@@ -44,7 +44,6 @@ const UserSchema = new Schema<IUser>(
 
 // Indexes
 UserSchema.index({ phone: 1 });
-UserSchema.index({ clerkId: 1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {

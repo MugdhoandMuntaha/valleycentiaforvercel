@@ -25,12 +25,12 @@ const CouponSchema = new Schema<ICoupon>(
         code: { type: String, required: true, unique: true, uppercase: true, trim: true },
         description: { type: String, default: null },
         discountType: { type: String, enum: ['percentage', 'fixed_amount', 'free_shipping'], required: true },
-        discountValue: { type: Number, required: true },
-        minimumOrderValue: { type: Number, default: 0 },
-        maxDiscountAmount: { type: Number, default: null },
-        usageLimit: { type: Number, default: null },
-        usageCount: { type: Number, default: 0 },
-        perUserLimit: { type: Number, default: 1 },
+        discountValue: { type: Number, required: true, min: 0 },
+        minimumOrderValue: { type: Number, default: 0, min: 0 },
+        maxDiscountAmount: { type: Number, default: null, min: 0 },
+        usageLimit: { type: Number, default: null, min: 1 },
+        usageCount: { type: Number, default: 0, min: 0 },
+        perUserLimit: { type: Number, default: 1, min: 1 },
         isActive: { type: Boolean, default: true },
         startsAt: { type: Date, default: Date.now },
         expiresAt: { type: Date, default: null },
@@ -40,7 +40,7 @@ const CouponSchema = new Schema<ICoupon>(
     { timestamps: true }
 );
 
-
+CouponSchema.index({ code: 1, isActive: 1 });
 
 const Coupon: Model<ICoupon> = mongoose.models.Coupon || mongoose.model<ICoupon>('Coupon', CouponSchema);
 export default Coupon;

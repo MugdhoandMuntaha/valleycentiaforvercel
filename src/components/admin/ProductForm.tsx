@@ -13,6 +13,7 @@ import {
     getAvailableCouponsSimple, getProductCoupon, assignProductCoupon,
 } from '@/lib/db/adminQueries';
 import type { ProductFormData, BrandOption, CategoryOption, SectionOption } from '@/lib/db/adminQueries';
+import { getDefaultBadgeColor, getDefaultBadgeLabel } from '@/lib/badgeUtils';
 
 // ============================================================================
 // TYPES
@@ -1184,8 +1185,16 @@ export default function ProductForm({ productId }: Props) {
                                     style={{ ...selectStyle, flex: '0 0 140px' }}
                                     value={b.badge}
                                     onChange={e => {
+                                        const val = e.target.value;
+                                        const defaultCol = getDefaultBadgeColor(val);
+                                        const defaultLabel = getDefaultBadgeLabel(val);
                                         const updated = [...form.badges];
-                                        updated[i] = { ...updated[i], badge: e.target.value };
+                                        updated[i] = {
+                                            ...updated[i],
+                                            badge: val,
+                                            badge_color: updated[i].badge_color || defaultCol,
+                                            custom_label: updated[i].custom_label || defaultLabel,
+                                        };
                                         setForm(f => ({ ...f, badges: updated }));
                                     }}
                                 >
@@ -1211,7 +1220,9 @@ export default function ProductForm({ productId }: Props) {
                                             height: 28,
                                             borderRadius: 'var(--radius-sm)',
                                             border: '2px solid var(--color-border)',
-                                            background: b.badge_color && /^#([0-9A-Fa-f]{3}){1,2}$/.test(b.badge_color) ? b.badge_color : '#f0c14b',
+                                            background: b.badge_color && /^#([0-9A-Fa-f]{3}){1,2}$/.test(b.badge_color)
+                                                ? b.badge_color
+                                                : getDefaultBadgeColor(b.badge),
                                             flexShrink: 0,
                                             cursor: 'pointer',
                                             position: 'relative',
@@ -1221,7 +1232,9 @@ export default function ProductForm({ productId }: Props) {
                                     >
                                         <input
                                             type="color"
-                                            value={b.badge_color && /^#([0-9A-Fa-f]{3}){1,2}$/.test(b.badge_color) ? b.badge_color : '#f0c14b'}
+                                            value={b.badge_color && /^#([0-9A-Fa-f]{3}){1,2}$/.test(b.badge_color)
+                                                ? b.badge_color
+                                                : getDefaultBadgeColor(b.badge)}
                                             onChange={e => {
                                                 const updated = [...form.badges];
                                                 updated[i] = { ...updated[i], badge_color: e.target.value };

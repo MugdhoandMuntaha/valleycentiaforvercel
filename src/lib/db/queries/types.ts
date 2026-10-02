@@ -221,6 +221,11 @@ export interface ProductFilters {
     type?: string;
     sort?: string;
     search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    inStockOnly?: boolean;
+    limit?: number;
+    page?: number;
 }
 
 export interface AISearchParams {
