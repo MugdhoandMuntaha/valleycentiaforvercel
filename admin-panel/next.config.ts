@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import os from "os";
+import path from "path";
 
 // Find local IPv4 address dynamically for local network access
 const interfaces = os.networkInterfaces();
@@ -26,6 +27,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
