@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/uploads/:path*',
-        destination: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/uploads/:path*`,
+        destination: `${process.env.STOREFRONT_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/uploads/:path*`,
       },
     ];
   },
