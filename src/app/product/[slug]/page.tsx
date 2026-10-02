@@ -761,25 +761,8 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                         );
                     })()}
                 </div>
-                {/* Coupon — only shown if a coupon is assigned */}
-                {product.couponCode && product.couponPrice && (
-                    <div style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '6px',
-                        background: 'linear-gradient(135deg, #e8f5e9, #f1f8e9)', padding: '5px 12px',
-                        borderRadius: '8px', border: '1px dashed #4caf50',
-                    }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#2e7d32' }}>
-                            ⭐ Get it for ৳{product.couponPrice} with code
-                        </span>
-                        <span style={{
-                            fontSize: '11px', fontWeight: 800, color: '#1a1a1a',
-                            background: '#ffc107', padding: '2px 7px', borderRadius: '4px',
-                        }}>
-                            {product.couponCode}
-                        </span>
-                    </div>
-                )}
-                
+
+
             </div>
 
             {/* Size Selector */}

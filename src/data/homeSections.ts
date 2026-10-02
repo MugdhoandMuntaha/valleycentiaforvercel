@@ -15,7 +15,6 @@ export interface SectionProduct {
     reviewCount: string;
     badge?: string;
     badgeColor?: string;
-    extraBadge?: string;
     inStock?: boolean;
     stockQuantity?: number;
     sizes?: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
@@ -40,7 +39,6 @@ export const bestSellerProducts: SectionProduct[] = [
         rating: 4.66,
         reviewCount: '1.4K',
         badge: 'Best Seller',
-        extraBadge: 'Upto 100% Dandruff Reduction',
     },
     {
         id: 2,
@@ -256,7 +254,6 @@ export const powerCareDuoProducts: SectionProduct[] = [
         reviewCount: '2.9K',
         badge: 'Best Seller',
         badgeColor: '#2e7d32',
-        extraBadge: 'Pack\nof 2',
     },
     {
         id: 4,

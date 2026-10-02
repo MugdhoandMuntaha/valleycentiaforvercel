@@ -162,62 +162,26 @@ export default function ProductCard({
                     }}
                 >
                     {/* Top-left Badge */}
-                    {product.badge && (() => {
-                        const bg = product.badgeColor || '#f0c14b';
-                        const ch = bg.replace('#', '');
-                        const isLight = ch.length >= 6 && (0.299 * parseInt(ch.substring(0, 2), 16) + 0.587 * parseInt(ch.substring(2, 4), 16) + 0.114 * parseInt(ch.substring(4, 6), 16)) / 255 > 0.55;
-                        return (
-                            <span
-                                style={{
-                                    position: 'absolute',
-                                    top: '10px',
-                                    left: '10px',
-                                    background: bg,
-                                    color: isLight ? '#1a1a1a' : '#ffffff',
-                                    fontFamily: "'Inter', sans-serif",
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    padding: '5px 14px',
-                                    borderRadius: '6px',
-                                    letterSpacing: '0.3px',
-                                    lineHeight: '1',
-                                    textTransform: 'uppercase',
-                                    zIndex: 3,
-                                }}
-                            >
-                                {product.badge.replace(/_/g, ' ')}
-                            </span>
-                        );
-                    })()}
-
-                    {/* Top-right Circular Extra Badge */}
-                    {product.extraBadge && (
+                    {product.badge && (
                         <span
                             style={{
                                 position: 'absolute',
-                                top: '10px',
-                                right: '10px',
-                                background: product.badgeColor === '#2e7d32'
-                                    ? '#e91e63'
-                                    : 'rgba(46,125,50,0.9)',
+                                top: 0,
+                                left: 0,
+                                background: '#000000',
                                 color: '#ffffff',
-                                fontFamily: "'Outfit', sans-serif",
-                                fontSize: product.badgeColor ? '11px' : '9px',
-                                fontWeight: product.badgeColor ? 800 : 700,
-                                padding: '6px',
-                                borderRadius: '50%',
-                                width: product.badgeColor ? '52px' : '56px',
-                                height: product.badgeColor ? '52px' : '56px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                textAlign: 'center',
-                                lineHeight: 1.15,
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '12px 0 6px 0',
+                                letterSpacing: '0.5px',
+                                lineHeight: '1.2',
+                                textTransform: 'uppercase',
                                 zIndex: 3,
-                                whiteSpace: 'pre-line',
                             }}
                         >
-                            {product.extraBadge}
+                            {product.badge.replace(/_/g, ' ')}
                         </span>
                     )}
 
@@ -231,7 +195,7 @@ export default function ProductCard({
                             }}
                             style={{
                                 position: 'absolute',
-                                top: product.extraBadge ? '72px' : '10px',
+                                top: '10px',
                                 right: '10px',
                                 width: '36px',
                                 height: '36px',
@@ -293,7 +257,7 @@ export default function ProductCard({
                         }}
                     >
                         {/* Rating/Review */}
-                        {product.rating !== undefined && product.rating > 0 && (
+                        {!isCarousel && product.rating !== undefined && product.rating > 0 && (
                             <div
                                 style={{
                                     display: 'flex',
@@ -310,10 +274,10 @@ export default function ProductCard({
                                         fontFamily: "'Inter', sans-serif",
                                         fontSize: '13px',
                                         fontWeight: 700,
-                                        color: '#ffb700',
+                                        color: '#4caf50',
                                     }}
                                 >
-                                    <Star size={13} fill="#ffb700" stroke="#ffb700" />
+                                    <Star size={13} fill="#4caf50" stroke="#4caf50" />
                                     {product.rating}
                                 </span>
                                 {product.reviewCount && (
@@ -336,8 +300,8 @@ export default function ProductCard({
                                 className={isCarousel ? 'card-title' : 'shop-card-title'}
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
-                                    fontSize: '17px',
-                                    fontWeight: 700,
+                                    fontSize: '18px',
+                                    fontWeight: 600,
                                     color: '#1a1a1a',
                                     lineHeight: 1.4,
                                     marginBottom: '4px',
@@ -363,7 +327,8 @@ export default function ProductCard({
                                     lineHeight: 1.4,
                                     marginBottom: '12px',
                                     display: '-webkit-box',
-                                    WebkitLineClamp: 1,
+                                    WebkitLineClamp: 2,
+                                    lineClamp: 2,
                                     WebkitBoxOrient: 'vertical',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -378,61 +343,59 @@ export default function ProductCard({
 
                         {/* Price Row */}
                         <div style={{ marginTop: 'auto' }}>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'baseline',
-                                    justifyContent: 'space-between',
-                                    gap: '8px',
-                                    marginBottom: '8px',
-                                    flexWrap: 'wrap',
-                                }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                    <span
-                                        className="card-price"
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '10px' }}>
+                                {/* Current Price */}
+                                <span
+                                    className="card-price"
+                                    style={{
+                                        fontFamily: "'Inter', sans-serif",
+                                        fontSize: '20px',
+                                        fontWeight: 700,
+                                        color: '#1a1a1a',
+                                        lineHeight: 1,
+                                    }}
+                                >
+                                    ৳{product.price}
+                                </span>
+
+                                {/* Strikethrough Original Price & Discount Row */}
+                                {((product.originalPrice != null && product.originalPrice > product.price) || discount > 0) && (
+                                    <div
                                         style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '20px',
-                                            fontWeight: 700,
-                                            color: '#1a1a1a',
-                                            lineHeight: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            lineHeight: 1.2,
                                         }}
                                     >
-                                        ৳{product.price}
-                                    </span>
-                                    {product.originalPrice != null && product.originalPrice > 0 && (
-                                        <span
-                                            className="card-original-price"
-                                            style={{
-                                                fontFamily: "'Inter', sans-serif",
-                                                fontSize: '14px',
-                                                color: '#bbb',
-                                                textDecoration: 'line-through',
-                                                lineHeight: 1,
-                                            }}
-                                        >
-                                            ৳{product.originalPrice}
-                                        </span>
-                                    )}
-                                </div>
-                                {discount > 0 && (
-                                    <span
-                                        style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '11px',
-                                            fontWeight: 700,
-                                            color: '#0d6b3d',
-                                            background: '#e8f5e9',
-                                            padding: '3px 8px',
-                                            borderRadius: '6px',
-                                            lineHeight: 1.1,
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.3px',
-                                        }}
-                                    >
-                                        {Math.ceil(discount)}% OFF
-                                    </span>
+                                        {product.originalPrice != null && product.originalPrice > product.price && (
+                                            <span
+                                                className="card-original-price"
+                                                style={{
+                                                    fontFamily: "'Inter', sans-serif",
+                                                    fontSize: '13px',
+                                                    color: '#9ca3af',
+                                                    textDecoration: 'line-through',
+                                                    fontWeight: 400,
+                                                }}
+                                            >
+                                                ৳{product.originalPrice}
+                                            </span>
+                                        )}
+                                        {discount > 0 && (
+                                            <span
+                                                style={{
+                                                    fontFamily: "'Inter', sans-serif",
+                                                    fontSize: '13px',
+                                                    fontWeight: 700,
+                                                    color: '#4caf50',
+                                                    letterSpacing: '0.2px',
+                                                }}
+                                            >
+                                                {Math.ceil(discount)}% OFF
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
 

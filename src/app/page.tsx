@@ -1,8 +1,7 @@
 import HeroCarousel from '@/components/HeroCarousel';
 import ProductCarouselSection from '@/components/ProductCarouselSection';
 import BrandsThatLead from '@/components/BrandsThatLead';
-import VisibleChange from '@/components/VisibleChange';
-import { getHeroSlides, getHomepageSections, getBrands, getVisibleChanges } from '@/lib/db/queries';
+import { getHeroSlides, getHomepageSections, getBrands } from '@/lib/db/queries';
 import type { SectionProductCard } from '@/lib/db/queries';
 import type { SectionProduct } from '@/data/homeSections';
 
@@ -27,7 +26,6 @@ function toSectionProduct(p: SectionProductCard): SectionProduct {
     reviewCount: formatReviewCount(Number(p.review_count) || 0),
     badge: badgeText,
     badgeColor: isPremium ? '#f0c14b' : (primaryBadge?.color || undefined),
-    extraBadge: (p.custom_badge_text as string) || undefined,
     inStock: p.in_stock !== undefined ? p.in_stock : true,
     stockQuantity: p.stock_quantity !== undefined ? p.stock_quantity : 0,
     sizes: p.sizes || null,
@@ -49,11 +47,10 @@ export const revalidate = 60; // Regenerate homepage at most once every 60 secon
 
 export default async function HomePage() {
   // Fetch all data server-side in parallel
-  const [slides, sections, brands, visibleChanges] = await Promise.all([
+  const [slides, sections, brands] = await Promise.all([
     getHeroSlides(),
     getHomepageSections(),
     getBrands(),
-    getVisibleChanges(),
   ]);
 
   // Map hero slides
@@ -105,14 +102,7 @@ export default async function HomePage() {
           );
         }
 
-        if (section.section_type === 'visible_change') {
-          return (
-            <VisibleChange
-              key={section.id}
-              items={visibleChanges}
-            />
-          );
-        }
+
 
         // Default to ProductCarouselSection for other types (best_sellers, new_launches, power_care_duos, custom)
         return (
@@ -127,10 +117,7 @@ export default async function HomePage() {
         );
       })}
 
-      {/* Fallback for Visible Change if not dynamically placed in database */}
-      {!activeSections.some(s => s.section_type === 'visible_change') && (
-        <VisibleChange items={visibleChanges} />
-      )}
+
     </>
   );
 }
