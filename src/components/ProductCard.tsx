@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Star, Heart, Check } from 'lucide-react';
@@ -28,6 +28,13 @@ export default function ProductCard({
     const { isWishlisted, toggleWishlist } = useWishlist();
 
     const wishlisted = isWishlisted(String(product.id));
+
+    // Image fallback state
+    const [imgSrc, setImgSrc] = useState(product.image || '/no-image.svg');
+
+    useEffect(() => {
+        setImgSrc(product.image || '/no-image.svg');
+    }, [product.image]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -201,7 +208,7 @@ export default function ProductCard({
                         }}
                     >
                         <Image
-                            src={product.image}
+                            src={imgSrc}
                             alt={product.title}
                             fill
                             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -210,6 +217,7 @@ export default function ProductCard({
                                 transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                             }}
                             className="product-image"
+                            onError={() => setImgSrc('/no-image.svg')}
                         />
                     </Link>
 
