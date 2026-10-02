@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getWishlist, addToWishlist, removeFromWishlist } from './db/queries';
-import { useCart } from './CartContext';
+import { useToast } from './ToastContext';
 
 interface WishlistContextType {
     wishlist: string[];
@@ -23,7 +23,7 @@ const WishlistContext = createContext<WishlistContextType>({
 
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
-    const { showToast } = useCart();
+    const { showToast } = useToast();
     const [wishlist, setWishlist] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
 

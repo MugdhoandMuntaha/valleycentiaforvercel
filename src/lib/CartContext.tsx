@@ -1,17 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
-
-/* ===== Toast Types ===== */
-interface Toast {
-    id: string;
-    message: string;
-    type: 'success' | 'info' | 'error' | 'cart';
-    icon?: React.ReactNode;
-}
+import { useToast } from '@/lib/ToastContext';
 
 /* ===== Cart Types ===== */
 export interface CartItem {
@@ -35,105 +26,21 @@ interface CartContextType {
     totalItems: number;
     totalPrice: number;
     cartBounce: boolean;
-    showToast: (message: string, type?: Toast['type']) => void;
+    /** @deprecated Use useToast().showToast instead — kept for backward compat */
+    showToast: (message: string, type?: 'success' | 'info' | 'error' | 'cart') => void;
     isHydrated: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-/* ===== Toast Component ===== */
-function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
-    return (
-        <div style={{
-            position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 99999,
-            display: 'flex', flexDirection: 'column', gap: 8,
-            pointerEvents: 'none',
-            alignItems: 'center',
-        }}>
-            <AnimatePresence>
-                {toasts.map((toast) => (
-                    <motion.div
-                        key={toast.id}
-                        initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -50, scale: 0.9 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '12px 18px', borderRadius: 12,
-                            background: toast.type === 'error' ? '#1a1a1a' :
-                                toast.type === 'cart' ? '#1a1a1a' : '#1a1a1a',
-                            color: '#fff',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: 13, fontWeight: 600,
-                            pointerEvents: 'auto',
-                            minWidth: 240, maxWidth: 360,
-                            backdropFilter: 'blur(12px)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                        }}
-                    >
-                        <div style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0,
-                            background: toast.type === 'success' || toast.type === 'cart'
-                                ? 'rgba(34,197,94,0.15)'
-                                : toast.type === 'error'
-                                    ? 'rgba(239,68,68,0.15)'
-                                    : 'rgba(245,197,24,0.15)',
-                        }}>
-                            {toast.type === 'cart' ? (
-                                <ShoppingBag size={14} color="#22c55e" />
-                            ) : toast.type === 'success' ? (
-                                <Check size={14} color="#22c55e" />
-                            ) : toast.type === 'error' ? (
-                                <X size={14} color="#ef4444" />
-                            ) : (
-                                <Check size={14} color="#f5c518" />
-                            )}
-                        </div>
-                        <span style={{ flex: 1 }}>{toast.message}</span>
-                        <button
-                            onClick={() => onDismiss(toast.id)}
-                            style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                color: 'rgba(255,255,255,0.4)', padding: 2,
-                                display: 'flex', alignItems: 'center',
-                            }}
-                        >
-                            <X size={14} />
-                        </button>
-                    </motion.div>
-                ))}
-            </AnimatePresence>
-        </div>
-    );
-}
-
-/* ===== Provider ===== */
-export function CartProvider({ children }: { children: React.ReactNode }) {
-    const [items, setItems] = useState<CartItem[]>([]);
-    const [isHydrated, setIsHydrated] = useState(false);
-    const [cartBounce, setCartBounce] = useState(false);
-    const [toasts, setToasts] = useState<Toast[]>([]);
-    const toastCounter = useRef(0);
-
-    const { user } = useAuth();
+/* ===== Cart Sync Hook (SRP: DB sync logic extracted) ===== */
+function useCartSync(
+    items: CartItem[],
+    isHydrated: boolean,
+    user: { id: string } | null,
+    setItems: React.Dispatch<React.SetStateAction<CartItem[]>>,
+) {
     const hasSyncedInit = useRef(false);
-
-    // Load from localStorage on mount
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem('valleycentia-cart');
-            if (stored) {
-                setItems(JSON.parse(stored));
-            }
-        } catch {
-            // ignore parse errors
-        }
-        setIsHydrated(true);
-    }, []);
 
     // Load/merge from database when user logs in
     useEffect(() => {
@@ -142,17 +49,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         async function syncCartWithDb() {
             if (user) {
                 try {
-                    // Fetch cart items from DB
                     const res = await fetch('/api/cart');
                     if (res.ok) {
                         const data = await res.json();
                         const dbItems = data.items || [];
                         
                         if (dbItems.length > 0 && items.length === 0) {
-                            // If local cart is empty, restore DB cart
                             setItems(dbItems);
                         } else if (items.length > 0) {
-                            // If local cart has items, sync it to DB
                             await fetch('/api/cart', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -173,7 +77,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         syncCartWithDb();
     }, [user, isHydrated]);
 
-    // Upload items to DB when they change (only after initial sync is done)
+    // Upload items to DB when they change (debounced, only after initial sync)
     useEffect(() => {
         if (!isHydrated || !user || !hasSyncedInit.current) return;
 
@@ -187,10 +91,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             } catch (err) {
                 console.error('Failed to sync cart updates to database:', err);
             }
-        }, 1000); // Debounce DB requests
+        }, 1000);
 
         return () => clearTimeout(timeout);
     }, [items, user, isHydrated]);
+}
+
+/* ===== Provider ===== */
+export function CartProvider({ children }: { children: React.ReactNode }) {
+    const [items, setItems] = useState<CartItem[]>([]);
+    const [isHydrated, setIsHydrated] = useState(false);
+    const [cartBounce, setCartBounce] = useState(false);
+
+    const { user } = useAuth();
+    const { showToast } = useToast();
+
+    // Load from localStorage on mount
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('valleycentia-cart');
+            if (stored) {
+                setItems(JSON.parse(stored));
+            }
+        } catch {
+            // ignore parse errors
+        }
+        setIsHydrated(true);
+    }, []);
+
+    // DB sync (extracted into hook for SRP)
+    useCartSync(items, isHydrated, user, setItems);
 
     // Persist to localStorage on change
     useEffect(() => {
@@ -199,17 +129,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [items, isHydrated]);
 
-    const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
-        const id = `toast-${++toastCounter.current}`;
-        setToasts((prev) => [...prev, { id, message, type }]);
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 3000);
-    }, []);
-
-    const dismissToast = useCallback((id: string) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, []);
+    /** Generate a unique key for cart item (handles size variants) */
+    const itemKey = (id: string, size?: string) => size ? `${id}-${size}` : id;
 
     const addToCart = useCallback((item: Omit<CartItem, 'quantity'>, quantity = 1) => {
         const roundedItem = {
@@ -218,44 +139,42 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             originalPrice: item.originalPrice ? Math.ceil(item.originalPrice) : undefined,
         };
         setItems((prev) => {
-            const key = roundedItem.size ? `${roundedItem.id}-${roundedItem.size}` : roundedItem.id;
+            const key = itemKey(roundedItem.id, roundedItem.size);
             const existing = prev.find(
-                (i) => (i.size ? `${i.id}-${i.size}` : i.id) === key
+                (i) => itemKey(i.id, i.size) === key
             );
             const maxStock = item.stockQuantity !== undefined ? item.stockQuantity : 999;
             if (existing) {
                 return prev.map((i) =>
-                    (i.size ? `${i.id}-${i.size}` : i.id) === key
+                    itemKey(i.id, i.size) === key
                         ? { ...i, quantity: Math.min(i.quantity + quantity, maxStock) }
                         : i
                 );
             }
             return [...prev, { ...roundedItem, quantity: Math.min(quantity, maxStock) }];
         });
-        // Trigger bounce animation
         setCartBounce(true);
         setTimeout(() => setCartBounce(false), 700);
-        // Show toast
         showToast(`${item.name.length > 30 ? item.name.substring(0, 30) + '…' : item.name} added to cart`, 'cart');
     }, [showToast]);
 
     const removeFromCart = useCallback((id: string, size?: string) => {
         setItems((prev) => {
-            const key = size ? `${id}-${size}` : id;
-            const item = prev.find((i) => (i.size ? `${i.id}-${i.size}` : i.id) === key);
+            const key = itemKey(id, size);
+            const item = prev.find((i) => itemKey(i.id, i.size) === key);
             if (item) {
                 showToast(`${item.name.length > 30 ? item.name.substring(0, 30) + '…' : item.name} removed from cart`, 'info');
             }
-            return prev.filter((i) => (i.size ? `${i.id}-${i.size}` : i.id) !== key);
+            return prev.filter((i) => itemKey(i.id, i.size) !== key);
         });
     }, [showToast]);
 
     const updateQuantity = useCallback((id: string, quantity: number, size?: string) => {
         if (quantity < 1) return;
         setItems((prev) => {
-            const key = size ? `${id}-${size}` : id;
+            const key = itemKey(id, size);
             return prev.map((i) => {
-                if ((i.size ? `${i.id}-${i.size}` : i.id) === key) {
+                if (itemKey(i.id, i.size) === key) {
                     const maxStock = i.stockQuantity !== undefined ? i.stockQuantity : 999;
                     return { ...i, quantity: Math.min(quantity, maxStock) };
                 }
@@ -284,7 +203,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, totalItems, totalPrice, cartBounce, showToast, isHydrated }}
         >
             {children}
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </CartContext.Provider>
     );
 }

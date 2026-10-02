@@ -1,7 +1,16 @@
 /* ─── Shared product type for all carousel sections ─── */
 
+export interface ProductSize {
+    id: string;
+    label: string;
+    ml: string | null;
+    price: number;
+    is_default: boolean;
+    stockQuantity?: number;
+}
+
 export interface SectionProduct {
-    id: string | number;
+    id: string;
     slug: string;
     image: string;
     title: string;
@@ -17,7 +26,7 @@ export interface SectionProduct {
     badgeColor?: string;
     inStock?: boolean;
     stockQuantity?: number;
-    sizes?: { id: string; label: string; ml: string | null; price: number; is_default: boolean; stockQuantity?: number }[] | null;
+    sizes?: ProductSize[] | null;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -26,7 +35,7 @@ export interface SectionProduct {
 
 export const bestSellerProducts: SectionProduct[] = [
     {
-        id: 1,
+        id: '1',
         slug: 'anti-dandruff-shampoo',
         image: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400&q=80',
         title: 'Anti Dandruff Shampoo with Salicylic Acid & Biotin - 250 ml',
@@ -41,7 +50,7 @@ export const bestSellerProducts: SectionProduct[] = [
         badge: 'Best Seller',
     },
     {
-        id: 2,
+        id: '2',
         slug: 'rosemary-rice-water-spray',
         image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=400&q=80',
         title: 'Rosemary & Rice Water Hair Growth Spray for Hair Growth &...',
@@ -56,7 +65,7 @@ export const bestSellerProducts: SectionProduct[] = [
         badge: 'Best Seller',
     },
     {
-        id: 3,
+        id: '3',
         slug: 'exfoliating-body-wash',
         image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80',
         title: 'Exfoliating Body Wash with Lactic Acid & Salicylic Acid - 236 ml',
@@ -71,7 +80,7 @@ export const bestSellerProducts: SectionProduct[] = [
         badge: 'Best Seller',
     },
     {
-        id: 4,
+        id: '4',
         slug: 'salicylic-acid-face-wash',
         image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=400&q=80',
         title: '2% Salicylic Acid Face Wash for Acne & Oil Control - 100 ml',
@@ -86,7 +95,7 @@ export const bestSellerProducts: SectionProduct[] = [
         badge: 'Best Seller',
     },
     {
-        id: 5,
+        id: '5',
         slug: 'vitamin-c-brightening-serum',
         image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80',
         title: 'Vitamin C Brightening Serum with Hyaluronic Acid - 30 ml',
@@ -101,7 +110,7 @@ export const bestSellerProducts: SectionProduct[] = [
         badge: 'Best Seller',
     },
     {
-        id: 6,
+        id: '6',
         slug: 'keratin-smooth-shampoo',
         image: 'https://images.unsplash.com/photo-1585232004423-244e0e6904e3?w=400&q=80',
         title: 'Keratin Smooth Shampoo for Frizz Control - 300 ml',
@@ -123,7 +132,7 @@ export const bestSellerProducts: SectionProduct[] = [
 
 export const newLaunchProducts: SectionProduct[] = [
     {
-        id: 1,
+        id: '1',
         slug: 'rosemary-rice-water-spray',
         image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=400&q=80',
         title: 'Fenugreek & Curry Leaves Hair Strengthening Spray - 200 ml',
@@ -136,7 +145,7 @@ export const newLaunchProducts: SectionProduct[] = [
         badge: 'New Launch',
     },
     {
-        id: 2,
+        id: '2',
         slug: 'exfoliating-body-wash',
         image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80',
         title: 'Epsom Salt Body Wash with Lavender Oil & Aloe Vera - 236 ml',
@@ -149,7 +158,7 @@ export const newLaunchProducts: SectionProduct[] = [
         badge: 'New Launch',
     },
     {
-        id: 3,
+        id: '3',
         slug: 'salicylic-acid-face-wash',
         image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=400&q=80',
         title: 'Oil Control Face Moisturizer with Niacinamide & Vitamin B5 - 100...',
@@ -162,7 +171,7 @@ export const newLaunchProducts: SectionProduct[] = [
         badge: 'New Launch',
     },
     {
-        id: 4,
+        id: '4',
         slug: 'vitamin-c-brightening-serum',
         image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80',
         title: '0.1% Retinol Night Cream for Fine Lines & Wrinkles - 30 gm',
@@ -175,7 +184,7 @@ export const newLaunchProducts: SectionProduct[] = [
         badge: 'New Launch',
     },
     {
-        id: 5,
+        id: '5',
         slug: 'anti-dandruff-shampoo',
         image: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400&q=80',
         title: 'Tea Tree & Salicylic Acid Anti-Acne Face Serum - 30 ml',
@@ -188,7 +197,7 @@ export const newLaunchProducts: SectionProduct[] = [
         badge: 'New Launch',
     },
     {
-        id: 6,
+        id: '6',
         slug: 'keratin-smooth-shampoo',
         image: 'https://images.unsplash.com/photo-1585232004423-244e0e6904e3?w=400&q=80',
         title: 'Argan Oil Deep Conditioning Hair Mask - 200 gm',
@@ -208,7 +217,7 @@ export const newLaunchProducts: SectionProduct[] = [
 
 export const powerCareDuoProducts: SectionProduct[] = [
     {
-        id: 1,
+        id: '1',
         slug: 'anti-dandruff-shampoo',
         image: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400&q=80',
         title: 'Anti-Dandruff Shampoo (250 ml) & Conditioner (175 gm) Combo...',
@@ -224,7 +233,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         badgeColor: '#2e7d32',
     },
     {
-        id: 2,
+        id: '2',
         slug: 'rosemary-rice-water-spray',
         image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=400&q=80',
         title: 'Anti-Hair Fall Shampoo (250 ml) & Conditioner (175 gm) Combo...',
@@ -240,7 +249,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         badgeColor: '#2e7d32',
     },
     {
-        id: 3,
+        id: '3',
         slug: 'exfoliating-body-wash',
         image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80',
         title: 'Exfoliating Body Wash with Lactic Acid & Salicylic Acid - 236 ml |...',
@@ -256,7 +265,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         badgeColor: '#2e7d32',
     },
     {
-        id: 4,
+        id: '4',
         slug: 'vitamin-c-brightening-serum',
         image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80',
         title: 'Rosemary & Rice Water Hair Growth Spray - 200 ml | Pack of 2',
@@ -272,7 +281,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         badgeColor: '#00897b',
     },
     {
-        id: 5,
+        id: '5',
         slug: 'salicylic-acid-face-wash',
         image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=400&q=80',
         title: 'Daily Moisturizer & Sunscreen SPF 50+ Combo Pack',
@@ -288,7 +297,7 @@ export const powerCareDuoProducts: SectionProduct[] = [
         badgeColor: '#2e7d32',
     },
     {
-        id: 6,
+        id: '6',
         slug: 'keratin-smooth-shampoo',
         image: 'https://images.unsplash.com/photo-1585232004423-244e0e6904e3?w=400&q=80',
         title: 'Keratin Shampoo & Hair Mask Repair Duo - 500 ml',
