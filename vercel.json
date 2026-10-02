@@ -1,0 +1,89 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "nextjs"
+    },
+    "admin-panel": {
+      "root": "admin-panel",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "app",
+          "format": "url",
+          "env": "STOREFRONT_URL"
+        }
+      ]
+    },
+    "oms-panel": {
+      "root": "oms-panel",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "app",
+          "format": "url",
+          "env": "STOREFRONT_URL"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/admin/orders",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/orders/(.*)",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/analytics",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/analytics/(.*)",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/incomplete",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/incomplete/(.*)",
+      "destination": {
+        "service": "oms-panel"
+      }
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": {
+        "service": "admin-panel"
+      }
+    },
+    {
+      "source": "/admin",
+      "destination": {
+        "service": "admin-panel"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
