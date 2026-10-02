@@ -895,7 +895,7 @@ a {
   }
 
   .carousel-card .card-title {
-    font-size: 3.8vw !important;
+    font-size: 10px !important;
     line-height: 1.3 !important;
   }
 
@@ -930,19 +930,19 @@ a {
 
   .carousel-card .card-original-price,
   .shop-product-card .card-original-price {
-    font-size: 10px !important;
+    font-size: 9.5px !important;
   }
 
   .carousel-card .card-discount-pct,
   .shop-product-card .card-discount-pct {
-    font-size: 9.5px !important;
+    font-size: 9px !important;
   }
 
   .card-add-btn {
     width: auto !important;
-    padding: 6px 11px !important;
-    font-size: 10px !important;
-    letter-spacing: 0.3px !important;
+    padding: 5px 9px !important;
+    font-size: 9.5px !important;
+    letter-spacing: 0.25px !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     border-radius: 6px !important;
@@ -1099,19 +1099,12 @@ a {
   }
 
   .carousel-card .card-title {
-    font-size: 4.1vw !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
   }
 
   .carousel-card .card-content {
     padding: 1.2vh 2.8vw 1.5vh !important;
-  }
-
-  .carousel-card .card-price {
-    font-size: 4.4vw !important;
-  }
-
-  .carousel-card .card-original-price {
-    font-size: 3.3vw !important;
   }
 
   /* Brands — tighter */
@@ -1274,7 +1267,7 @@ a {
   }
 
   .shop-card-title {
-    font-size: 12px !important;
+    font-size: 10px !important;
     line-height: 1.3 !important;
     margin-bottom: 2px !important;
   }
