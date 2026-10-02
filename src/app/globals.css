@@ -903,24 +903,48 @@ a {
     margin-bottom: 1vh !important;
   }
 
-  .carousel-card .card-bottom-row {
+  /* Mobile Product Card — Side-by-side Price on left & Add-to-Cart on right */
+  .card-bottom-area {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 6px !important;
+    gap: 8px !important;
     width: 100% !important;
     margin-top: auto !important;
   }
 
-  .carousel-card .card-price {
-    font-size: 16px !important;
+  .card-price-section {
+    margin-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    min-width: 0 !important;
   }
 
-  .carousel-card .card-add-btn {
-    width: auto !important;
-    padding: 7px 11px !important;
+  .carousel-card .card-price,
+  .shop-product-card .card-price {
+    font-size: 16px !important;
+    line-height: 1.1 !important;
+  }
+
+  .carousel-card .card-original-price,
+  .shop-product-card .card-original-price {
     font-size: 11px !important;
+  }
+
+  .carousel-card .card-discount-pct,
+  .shop-product-card .card-discount-pct {
+    font-size: 10px !important;
+  }
+
+  .card-add-btn {
+    width: auto !important;
+    padding: 8px 13px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px !important;
+    white-space: nowrap !important;
     flex-shrink: 0 !important;
+    border-radius: 6px !important;
   }
 
   /* Scroll arrows — hide on mobile (swipe to scroll) */
