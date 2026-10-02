@@ -316,18 +316,37 @@ export default function ProductCard({
                         {/* Spacer */}
                         <div style={{ flex: 1 }} />
 
-                        {/* Price Row */}
-                        <div style={{ marginTop: 'auto' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '10px' }}>
+                        {/* Price & Action Row (Side-by-side on the same line) */}
+                        <div
+                            className="card-bottom-row"
+                            style={{
+                                marginTop: 'auto',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '8px',
+                                paddingTop: '6px',
+                            }}
+                        >
+                            {/* Left: Price Section */}
+                            <div
+                                className="card-price-col"
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    minWidth: 0,
+                                }}
+                            >
                                 {/* Current Price */}
                                 <span
                                     className="card-price"
                                     style={{
                                         fontFamily: "'Inter', sans-serif",
-                                        fontSize: '20px',
+                                        fontSize: '18px',
                                         fontWeight: 700,
                                         color: '#1a1a1a',
-                                        lineHeight: 1,
+                                        lineHeight: 1.1,
                                     }}
                                 >
                                     ৳{product.price}
@@ -336,10 +355,11 @@ export default function ProductCard({
                                 {/* Strikethrough Original Price & Discount Row */}
                                 {((product.originalPrice != null && product.originalPrice > product.price) || discount > 0) && (
                                     <div
+                                        className="card-discount-row"
                                         style={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '8px',
+                                            gap: '6px',
                                             lineHeight: 1.2,
                                         }}
                                     >
@@ -348,7 +368,7 @@ export default function ProductCard({
                                                 className="card-original-price"
                                                 style={{
                                                     fontFamily: "'Inter', sans-serif",
-                                                    fontSize: '13px',
+                                                    fontSize: '12px',
                                                     color: '#9ca3af',
                                                     textDecoration: 'line-through',
                                                     fontWeight: 400,
@@ -359,9 +379,10 @@ export default function ProductCard({
                                         )}
                                         {discount > 0 && (
                                             <span
+                                                className="card-discount-pct"
                                                 style={{
                                                     fontFamily: "'Inter', sans-serif",
-                                                    fontSize: '13px',
+                                                    fontSize: '11px',
                                                     fontWeight: 700,
                                                     color: '#4caf50',
                                                     letterSpacing: '0.2px',
@@ -374,32 +395,31 @@ export default function ProductCard({
                                 )}
                             </div>
 
-
-
-                            {/* Add to Cart */}
+                            {/* Right: Add to Cart Button */}
                             <button
                                 type="button"
                                 className="card-add-btn"
                                 disabled={product.inStock === false}
                                 onClick={handleAddToCartClick}
                                 style={{
-                                    width: '100%',
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: '8px',
+                                    gap: '6px',
                                     background: product.inStock === false ? '#e0e0e0' : (isAdded ? '#1a1a1a' : '#f5c518'),
                                     color: product.inStock === false ? '#888' : (isAdded ? '#ffffff' : '#1a1a1a'),
                                     border: 'none',
                                     borderRadius: '8px',
-                                    padding: '11px 0',
+                                    padding: '8px 14px',
                                     fontFamily: "'Inter', sans-serif",
-                                    fontSize: '13px',
+                                    fontSize: '12px',
                                     fontWeight: 700,
-                                    letterSpacing: '0.5px',
+                                    letterSpacing: '0.4px',
                                     cursor: product.inStock === false ? 'not-allowed' : 'pointer',
                                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                                     textTransform: 'uppercase',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
                                 }}
                                 onMouseEnter={(e) => {
                                     if (product.inStock === false) return;
@@ -421,7 +441,7 @@ export default function ProductCard({
                                 {product.inStock === false ? (
                                     'OUT OF STOCK'
                                 ) : isAdded ? (
-                                    <><Check size={15} className="cart-added-check" /> ADDED!</>
+                                    <><Check size={14} className="cart-added-check" /> ADDED!</>
                                 ) : (
                                     'ADD TO CART'
                                 )}
