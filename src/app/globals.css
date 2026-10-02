@@ -930,19 +930,19 @@ a {
 
   .carousel-card .card-original-price,
   .shop-product-card .card-original-price {
-    font-size: 9.5px !important;
+    font-size: 11px !important;
   }
 
   .carousel-card .card-discount-pct,
   .shop-product-card .card-discount-pct {
-    font-size: 9px !important;
+    font-size: 10px !important;
   }
 
   .card-add-btn {
     width: auto !important;
-    padding: 5px 9px !important;
-    font-size: 9.5px !important;
-    letter-spacing: 0.25px !important;
+    padding: 8px 13px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     border-radius: 6px !important;
