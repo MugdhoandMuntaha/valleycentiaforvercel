@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 
 interface BrandCard {
     id: number;
@@ -39,34 +40,26 @@ export default function BrandsThatLead({ brands = [], background = '#ffffff' }: 
                     margin: '0 auto',
                     padding: '0 80px',
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
                     marginBottom: '28px',
                 }}
             >
-                <div>
+                <div className="section-title-wrap">
                     <h2
                         style={{
                             fontFamily: "'Outfit', sans-serif",
-                            fontSize: '28px',
+                            fontSize: '24.5px',
                             fontWeight: 700,
                             color: '#1a1a1a',
-                            marginBottom: '6px',
-                            lineHeight: 1.2,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            margin: 0,
+                            lineHeight: 1.25,
                         }}
                     >
                         Brands That Lead
                     </h2>
-                    <p
-                        style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: '15px',
-                            color: '#888',
-                            fontWeight: 400,
-                        }}
-                    >
-                        The powerhouses behind your favourites
-                    </p>
                 </div>
             </div>
 

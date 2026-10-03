@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Star, Heart, Check } from 'lucide-react';
+import { Star, Heart, Check, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { SectionProduct } from '@/data/homeSections';
 import { useCart } from '@/lib/CartContext';
@@ -396,6 +396,7 @@ export default function ProductCard({
                                 className="card-add-btn"
                                 disabled={product.inStock === false}
                                 onClick={handleAddToCartClick}
+                                aria-label={product.inStock === false ? 'Out of stock' : 'Add to cart'}
                                 style={{
                                     width: '100%',
                                     display: 'flex',
@@ -433,11 +434,17 @@ export default function ProductCard({
                                 }}
                             >
                                 {product.inStock === false ? (
-                                    'OUT OF STOCK'
+                                    <span className="card-btn-text">OUT OF STOCK</span>
                                 ) : isAdded ? (
-                                    <><Check size={15} className="cart-added-check" /> ADDED!</>
+                                    <>
+                                        <Check size={16} className="cart-added-check" />
+                                        <span className="card-btn-text">ADDED!</span>
+                                    </>
                                 ) : (
-                                    'ADD TO CART'
+                                    <>
+                                        <ShoppingBag size={17} className="card-btn-icon" />
+                                        <span className="card-btn-text">ADD TO CART</span>
+                                    </>
                                 )}
                             </button>
                         </div>

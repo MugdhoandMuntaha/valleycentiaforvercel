@@ -218,6 +218,7 @@ export default function HeroCarousel({ slides = [] }: HeroCarouselProps) {
 
             {/* Carousel Dots */}
             <div
+                className="hero-dots"
                 onPointerDown={(e) => e.stopPropagation()}
                 style={{
                     display: 'flex',

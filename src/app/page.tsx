@@ -1,4 +1,5 @@
 import HeroCarousel from '@/components/HeroCarousel';
+import BrandScrollingRibbon from '@/components/BrandScrollingRibbon';
 import ProductCarouselSection from '@/components/ProductCarouselSection';
 import BrandsThatLead from '@/components/BrandsThatLead';
 import { getHeroSlides, getHomepageSections, getBrands } from '@/lib/db/queries';
@@ -85,6 +86,9 @@ export default async function HomePage() {
     <>
       {/* ===== HERO CAROUSEL ===== */}
       <HeroCarousel slides={heroSlides} />
+
+      {/* ===== BRAND SCROLLING RIBBON ===== */}
+      <BrandScrollingRibbon brands={brands} />
 
       {/* ===== DYNAMIC SECTIONS ORDERED BY DB SORT_ORDER ===== */}
       {activeSections.map((section, index) => {

@@ -29,9 +29,16 @@ interface VisibleChangeProps {
 export default function VisibleChange({ items }: VisibleChangeProps) {
     const transformations = items && items.length > 0 ? items : [];
     const { addToCart } = useCart();
+    const sectionRef = useRef<HTMLElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(() => (transformations && transformations.length > 2));
+    
+    // Animation refs for 60fps/120fps hardware-synced smooth transition
+    const isAnimatingRef = useRef(false);
+    const animFrameRef = useRef<number | null>(null);
+    const lastTriggerTimeRef = useRef(0);
+    const isUserTouchingRef = useRef(false);
 
     const checkScroll = () => {
         if (!scrollRef.current) return;
@@ -40,9 +47,71 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
         setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
     };
 
+    const cancelAnimation = () => {
+        if (animFrameRef.current !== null) {
+            cancelAnimationFrame(animFrameRef.current);
+            animFrameRef.current = null;
+        }
+        if (isAnimatingRef.current && scrollRef.current) {
+            scrollRef.current.style.scrollSnapType = '';
+            isAnimatingRef.current = false;
+        }
+    };
+
+    const triggerPeekAnimation = () => {
+        const el = scrollRef.current;
+        if (!el || isAnimatingRef.current || el.scrollLeft > 10 || isUserTouchingRef.current) return;
+
+        const isMobile = window.innerWidth <= 768;
+        const peekDistance = isMobile
+            ? Math.min(115, Math.max(75, window.innerWidth * 0.28))
+            : 160;
+
+        isAnimatingRef.current = true;
+        el.style.scrollSnapType = 'none';
+
+        const startTime = performance.now();
+        const forwardDuration = 420;
+        const holdDuration = 280;
+        const returnDuration = 450;
+        const totalDuration = forwardDuration + holdDuration + returnDuration;
+
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+        const easeInOutCubic = (t: number) =>
+            t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        const step = (now: number) => {
+            if (!isAnimatingRef.current || !scrollRef.current) return;
+
+            const elapsed = now - startTime;
+
+            if (elapsed < forwardDuration) {
+                const p = elapsed / forwardDuration;
+                scrollRef.current.scrollLeft = easeOutCubic(p) * peekDistance;
+                animFrameRef.current = requestAnimationFrame(step);
+            } else if (elapsed < forwardDuration + holdDuration) {
+                scrollRef.current.scrollLeft = peekDistance;
+                animFrameRef.current = requestAnimationFrame(step);
+            } else if (elapsed < totalDuration) {
+                const p = (elapsed - (forwardDuration + holdDuration)) / returnDuration;
+                scrollRef.current.scrollLeft = (1 - easeInOutCubic(p)) * peekDistance;
+                animFrameRef.current = requestAnimationFrame(step);
+            } else {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollLeft = 0;
+                    scrollRef.current.style.scrollSnapType = '';
+                }
+                isAnimatingRef.current = false;
+                animFrameRef.current = null;
+                checkScroll();
+            }
+        };
+
+        animFrameRef.current = requestAnimationFrame(step);
+    };
+
     useEffect(() => {
         checkScroll();
-        // A small timeout ensures NextJS styles are fully resolved and DOM dimensions are accurate
         const timer = setTimeout(checkScroll, 150);
 
         window.addEventListener('resize', checkScroll);
@@ -52,9 +121,69 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
         };
     }, [transformations]);
 
+    // Automatic peek transition when scrolling through the section
+    useEffect(() => {
+        const sectionEl = sectionRef.current;
+        const scrollEl = scrollRef.current;
+        if (!sectionEl || !scrollEl) return;
+
+        const handleTouchStart = () => {
+            isUserTouchingRef.current = true;
+            cancelAnimation();
+        };
+
+        const handleTouchEnd = () => {
+            setTimeout(() => {
+                isUserTouchingRef.current = false;
+            }, 300);
+        };
+
+        scrollEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+        scrollEl.addEventListener('pointerdown', handleTouchStart, { passive: true });
+        scrollEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+        scrollEl.addEventListener('pointerup', handleTouchEnd, { passive: true });
+        scrollEl.addEventListener('wheel', handleTouchStart, { passive: true });
+
+        let delayTimer: NodeJS.Timeout | null = null;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const now = Date.now();
+                        if (now - lastTriggerTimeRef.current > 2500) {
+                            lastTriggerTimeRef.current = now;
+                            if (delayTimer) clearTimeout(delayTimer);
+                            delayTimer = setTimeout(() => {
+                                if (scrollRef.current && scrollRef.current.scrollLeft <= 5) {
+                                    triggerPeekAnimation();
+                                }
+                            }, 100);
+                        }
+                    }
+                });
+            },
+            { threshold: 0.18 }
+        );
+
+        observer.observe(sectionEl);
+
+        return () => {
+            observer.disconnect();
+            cancelAnimation();
+            scrollEl.removeEventListener('touchstart', handleTouchStart);
+            scrollEl.removeEventListener('pointerdown', handleTouchStart);
+            scrollEl.removeEventListener('touchend', handleTouchEnd);
+            scrollEl.removeEventListener('pointerup', handleTouchEnd);
+            scrollEl.removeEventListener('wheel', handleTouchStart);
+            if (delayTimer) clearTimeout(delayTimer);
+        };
+    }, [transformations]);
+
     const scroll = (direction: 'left' | 'right') => {
+        cancelAnimation();
         if (!scrollRef.current) return;
-        const scrollAmount = scrollRef.current.clientWidth;
+        const scrollAmount = scrollRef.current.clientWidth * 0.8;
         scrollRef.current.scrollBy({
             left: direction === 'left' ? -scrollAmount : scrollAmount,
             behavior: 'smooth',
@@ -66,6 +195,7 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
 
     return (
         <section
+            ref={sectionRef}
             className="homepage-section"
             style={{
                 background: '#ffffff',
@@ -73,7 +203,7 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                 position: 'relative',
             }}
         >
-            {/* Header - Centered */}
+            {/* Header */}
             <div
                 className="section-header-row"
                 style={{
@@ -81,34 +211,26 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                     margin: '0 auto',
                     padding: '0 80px',
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
                     marginBottom: '28px',
                 }}
             >
-                <div>
+                <div className="section-title-wrap">
                     <h2
                         style={{
                             fontFamily: "'Outfit', sans-serif",
-                            fontSize: '28px',
+                            fontSize: '24.5px',
                             fontWeight: 700,
                             color: '#1a1a1a',
-                            marginBottom: '6px',
-                            lineHeight: 1.2,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            margin: 0,
+                            lineHeight: 1.25,
                         }}
                     >
                         Visible Change. Real Stories
                     </h2>
-                    <p
-                        style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: '15px',
-                            color: '#888',
-                            fontWeight: 400,
-                        }}
-                    >
-                        Because results speak louder than claims
-                    </p>
                 </div>
             </div>
 
@@ -118,7 +240,8 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                 {canScrollLeft && (
                     <button
                         onClick={() => scroll('left')}
-                        className="carousel-arrow"
+                        className="carousel-arrow carousel-arrow-left"
+                        aria-label="Scroll left"
                         style={{
                             position: 'absolute',
                             left: '24px',
@@ -127,8 +250,8 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                             width: '44px',
                             height: '44px',
                             borderRadius: '50%',
-                            background: '#ffffff',
-                            border: '1px solid #e0e0e0',
+                            background: '#1a1a1a',
+                            border: '1px solid #333',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                             cursor: 'pointer',
                             display: 'flex',
@@ -138,13 +261,13 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                             transition: 'all 0.2s ease',
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.25)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
                         }}
                     >
-                        <ChevronLeft size={22} color="#333" />
+                        <ChevronLeft size={22} color="#ffffff" />
                     </button>
                 )}
 
@@ -152,7 +275,8 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                 {canScrollRight && (
                     <button
                         onClick={() => scroll('right')}
-                        className="carousel-arrow"
+                        className="carousel-arrow carousel-arrow-right"
+                        aria-label="Scroll right"
                         style={{
                             position: 'absolute',
                             right: '24px',
@@ -161,8 +285,8 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                             width: '44px',
                             height: '44px',
                             borderRadius: '50%',
-                            background: '#ffffff',
-                            border: '1px solid #e0e0e0',
+                            background: '#1a1a1a',
+                            border: '1px solid #333',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                             cursor: 'pointer',
                             display: 'flex',
@@ -172,13 +296,13 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
                             transition: 'all 0.2s ease',
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.25)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
                         }}
                     >
-                        <ChevronRight size={22} color="#333" />
+                        <ChevronRight size={22} color="#ffffff" />
                     </button>
                 )}
 

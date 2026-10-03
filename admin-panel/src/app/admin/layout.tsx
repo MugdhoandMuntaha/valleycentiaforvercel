@@ -43,6 +43,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [checking, setChecking] = useState(true);
 
     useEffect(() => {
+        // Safety fallback: if auth resolution hangs longer than 2.5s, redirect to login
+        const timer = setTimeout(() => {
+            if (checking) {
+                console.warn('[AdminLayout] Auth check timed out, redirecting to login...');
+                window.location.href = '/auth?redirect=/admin';
+            }
+        }, 2500);
+
         if (!loading) {
             if (!user) {
                 window.location.href = '/auth?redirect=/admin';
@@ -52,7 +60,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 setChecking(false);
             }
         }
-    }, [user, role, loading, router]);
+
+        return () => clearTimeout(timer);
+    }, [user, role, loading, checking, router]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -79,6 +89,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 }}>
                     Verifying admin access...
                 </p>
+                <a
+                    href="/auth?redirect=/admin"
+                    style={{
+                        marginTop: '4px',
+                        color: 'var(--color-accent, #f5c518)',
+                        fontSize: '13px',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontFamily: "'Inter', sans-serif",
+                    }}
+                >
+                    Sign In
+                </a>
                 <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             </div>
         );

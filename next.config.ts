@@ -136,6 +136,23 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    if (process.env.NODE_ENV === 'development') {
+      return [
+        {
+          source: '/admin/:path*',
+          destination: 'http://localhost:3001/admin/:path*',
+          permanent: false,
+        },
+        {
+          source: '/admin',
+          destination: 'http://localhost:3001/admin',
+          permanent: false,
+        },
+      ];
+    }
+    return [];
+  },
   async rewrites() {
     return [
       {

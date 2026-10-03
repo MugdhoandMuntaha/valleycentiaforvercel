@@ -19,10 +19,8 @@ for (const name of Object.keys(interfaces)) {
 }
 
 if (process.env.NODE_ENV === 'development') {
-  const currentNextAuthUrl = process.env.NEXTAUTH_URL || 'http://localhost:3001';
-  if (currentNextAuthUrl.includes('localhost') || currentNextAuthUrl.includes('127.0.0.1')) {
-    process.env.NEXTAUTH_URL = currentNextAuthUrl.replace('localhost', localIp).replace('127.0.0.1', localIp);
-    console.log(`\x1b[33m[NextAuth] Dynamically configured NEXTAUTH_URL to ${process.env.NEXTAUTH_URL} for local network access\x1b[0m`);
+  if (!process.env.NEXTAUTH_URL) {
+    process.env.NEXTAUTH_URL = 'http://localhost:3001';
   }
 }
 
@@ -121,6 +119,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     'localhost:3001',
     'localhost:3000',
+    '127.0.0.1:3001',
+    '127.0.0.1:3000',
     '192.168.0.104:3001',
     '192.168.0.104:3000',
     `${localIp}:3001`,

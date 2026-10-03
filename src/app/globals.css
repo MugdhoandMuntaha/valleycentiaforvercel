@@ -244,6 +244,17 @@ a {
   display: none;
 }
 
+.desktop-hero-image {
+  max-height: 545px;
+  overflow: hidden;
+}
+
+.desktop-hero-image img {
+  max-height: 545px;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
 /* Product Card hover effects */
 .product-card:hover .product-image {
   transform: scale(1.08) !important;
@@ -252,6 +263,15 @@ a {
 .product-card:hover .quick-add-btn {
   opacity: 1 !important;
   transform: translateY(0) !important;
+}
+
+/* Product Card Button — Desktop PC defaults (show text only, hide icon) */
+.card-btn-icon {
+  display: none !important;
+}
+
+.card-btn-text {
+  display: inline !important;
 }
 
 /* ===== Responsive Breakpoints ===== */
@@ -804,11 +824,200 @@ a {
   animation: checkmark-pop 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* Section Header Title — uppercase, modern geometric typography */
+.section-header-row h2 {
+  font-family: var(--font-outfit), 'Outfit', sans-serif !important;
+  font-size: 24.5px !important;
+  font-weight: 700 !important;
+  color: #1a1a1a !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.25 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BRAND SCROLLING RIBBON (Under Hero Carousel)
+   ═══════════════════════════════════════════════════════ */
+
+.brand-ribbon-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #000000;
+  border-top: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1a1a1a;
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.5);
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  z-index: 5;
+  -webkit-font-smoothing: antialiased;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* Gradient edge fades for seamless smooth entry and exit */
+.brand-ribbon-container::before,
+.brand-ribbon-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.brand-ribbon-container::before {
+  left: 0;
+  background: linear-gradient(to right, #000000 35%, rgba(0, 0, 0, 0) 100%);
+}
+
+.brand-ribbon-container::after {
+  right: 0;
+  background: linear-gradient(to left, #000000 35%, rgba(0, 0, 0, 0) 100%);
+}
+
+.brand-ribbon-track {
+  display: flex;
+  width: max-content;
+  animation: brandRibbonScroll 36s linear infinite;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+.brand-ribbon-track:hover,
+.brand-ribbon-track:active {
+  animation-play-state: paused;
+}
+
+.brand-ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
+  flex-shrink: 0;
+}
+
+/* Clickable Logo Item */
+.brand-logo-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 0;
+  margin: 0;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  outline: none;
+}
+
+.brand-logo-item:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Rectangular brand logo badge — fills black area with a little margin */
+.brand-rect-badge {
+  position: relative;
+  height: 68px;
+  width: auto;
+  max-width: 320px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              background 0.25s ease,
+              border-color 0.25s ease;
+}
+
+.brand-logo-item:hover .brand-rect-badge {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(201, 169, 110, 0.4);
+}
+
+.brand-rect-logo-image {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+/* Monogram / Brand Name Fallback badge */
+.brand-rect-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.brand-rect-fallback-text {
+  font-family: var(--font-outfit), 'Outfit', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f3f3f3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+  padding: 0;
+  margin: 0;
+}
+
+.brand-logo-item:hover .brand-rect-fallback-text {
+  color: #c9a96e;
+}
+
+@keyframes brandRibbonScroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+
+
 /* ═══════════════════════════════════════════════════════
    HOMEPAGE RESPONSIVE — Tablet (≤1024px)
    ═══════════════════════════════════════════════════════ */
 
 @media (max-width: 1024px) {
+
+  /* Hero section tablet */
+  .hero-section {
+    max-height: 445px !important;
+  }
+
+  .desktop-hero-image {
+    max-height: 445px !important;
+  }
+
+  .desktop-hero-image img {
+    max-height: 445px !important;
+  }
 
   /* Section headers */
   .section-header-row {
@@ -816,7 +1025,9 @@ a {
   }
 
   .section-header-row h2 {
-    font-size: 24px !important;
+    font-size: 21.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
   }
 
   /* Product carousel cards */
@@ -858,11 +1069,30 @@ a {
   .section-header-row {
     padding: 0 3.8vw !important;
     margin-bottom: 2.2vh !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .section-header-row .section-title-wrap,
+  .section-header-row > div:first-child {
+    text-align: center !important;
+    align-items: center !important;
+  }
+
+  .section-header-row.has-view-all .section-title-wrap,
+  .section-header-row.has-view-all > div:first-child {
+    padding: 0 20vw !important;
+    box-sizing: border-box !important;
   }
 
   .section-header-row h2 {
-    font-size: 5.8vw !important;
-    margin-bottom: 0.25vh !important;
+    font-size: 18.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    margin-bottom: 0 !important;
+    text-align: center !important;
   }
 
   .section-header-row p {
@@ -870,8 +1100,68 @@ a {
   }
 
   .section-header-row .view-all-btn {
+    position: absolute !important;
+    right: 3.8vw !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
     padding: 1vh 3.8vw !important;
     font-size: 2.9vw !important;
+  }
+
+  /* Brand scrolling ribbon mobile adjustments */
+  .brand-ribbon-container {
+    padding: 4px 0 !important;
+  }
+
+  .brand-ribbon-container::before,
+  .brand-ribbon-container::after {
+    width: 36px !important;
+  }
+
+  .brand-logo-item {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .brand-rect-badge {
+    height: 48px !important;
+    width: auto !important;
+    max-width: 220px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 5px !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+  }
+
+  .brand-rect-logo-image {
+    height: 100% !important;
+    width: auto !important;
+    border-radius: 5px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .brand-rect-fallback {
+    padding: 0 10px !important;
+    margin: 0 !important;
+  }
+
+  .brand-rect-fallback-text {
+    font-size: 11px !important;
+    color: #f3f3f3 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .brand-ribbon-group {
+    gap: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .brand-ribbon-track {
+    animation-duration: 28s !important;
   }
 
   /* Product carousel cards — 2 per view */
@@ -885,73 +1175,142 @@ a {
   }
 
   .carousel-card {
-    min-width: 56vw !important;
-    max-width: 56vw !important;
-    height: 53vh !important;
+    min-width: 45vw !important;
+    max-width: 45vw !important;
+    height: 43.5vh !important;
+    min-height: 315px !important;
   }
 
   .carousel-card .card-image-area {
-    height: 31vh !important;
+    height: 29.5vh !important;
+    min-height: 210px !important;
+  }
+
+  .carousel-card .card-content {
+    padding: 8px 10px 10px !important;
   }
 
   .carousel-card .card-title {
-    font-size: 10px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
     line-height: 1.3 !important;
+    margin-bottom: 2px !important;
   }
 
   .carousel-card .card-desc {
-    font-size: 2.4vw !important;
-    margin-bottom: 0.8vh !important;
+    display: none !important;
   }
 
   /* Mobile Product Card — Side-by-side Price on left & Add-to-Cart on right */
   .card-bottom-area {
     display: flex !important;
+    flex-direction: row !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 6px !important;
+    gap: 8px !important;
     width: 100% !important;
     margin-top: auto !important;
+    padding-top: 4px !important;
   }
 
   .card-price-section {
     margin-bottom: 0 !important;
     display: flex !important;
     flex-direction: column !important;
+    align-items: flex-start !important;
     gap: 2px !important;
     min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .card-discount-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    line-height: 1.2 !important;
   }
 
   .carousel-card .card-price,
   .shop-product-card .card-price {
-    font-size: 14.5px !important;
-    line-height: 1.1 !important;
+    font-size: 16.5px !important;
+    font-weight: 700 !important;
+    color: #1a1a1a !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
   }
 
   .carousel-card .card-original-price,
   .shop-product-card .card-original-price {
-    font-size: 11px !important;
+    font-size: 12px !important;
+    color: #9ca3af !important;
+    white-space: nowrap !important;
   }
 
   .carousel-card .card-discount-pct,
   .shop-product-card .card-discount-pct {
-    font-size: 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #4caf50 !important;
+    white-space: nowrap !important;
+  }
+
+  .card-btn-text {
+    display: inline !important;
+  }
+
+  .card-btn-icon {
+    display: none !important;
   }
 
   .card-add-btn {
     width: auto !important;
-    padding: 8px 13px !important;
+    height: auto !important;
+    min-width: auto !important;
+    min-height: auto !important;
+    padding: 7px 11px !important;
     font-size: 11px !important;
+    font-weight: 700 !important;
     letter-spacing: 0.3px !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     border-radius: 6px !important;
+    background: #f5c518 !important;
+    color: #1a1a1a !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  /* Scroll arrows — hide on mobile (swipe to scroll) */
+
+  /* Black carousel scroll arrows — sleek indicator button */
   .carousel-arrow {
+    display: flex !important;
+    width: 36px !important;
+    height: 36px !important;
+    background: #1a1a1a !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+    border-radius: 50% !important;
+    z-index: 10 !important;
+    top: 38% !important;
+    transform: translateY(-50%) !important;
+    touch-action: manipulation;
+  }
+
+  .carousel-arrow-right {
+    right: 8px !important;
+  }
+
+  .carousel-arrow-left,
+  .carousel-arrow.carousel-arrow-left {
     display: none !important;
   }
+
+  .carousel-arrow svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
 
   /* Brands grid — 2 columns on mobile */
   .brands-grid {
@@ -1028,9 +1387,10 @@ a {
     letter-spacing: 0.48vw !important;
   }
 
-  /* Hero Carousel Square on Mobile */
+  /* Hero Carousel Rectangular on Mobile */
   .hero-section {
-    aspect-ratio: 16 / 13.5 !important;
+    aspect-ratio: 16 / 11.52 !important;
+    max-height: 300px !important;
   }
 
   .hero-slide-content {
@@ -1040,6 +1400,7 @@ a {
   .hero-slide-content img {
     height: 100% !important;
     object-fit: cover !important;
+    object-position: center !important;
   }
 
   .desktop-hero-image {
@@ -1049,6 +1410,10 @@ a {
   .mobile-hero-image {
     display: block !important;
     height: 100% !important;
+  }
+
+  .hero-dots {
+    bottom: 8px !important;
   }
 
   /* Footer adjustments */
@@ -1065,17 +1430,42 @@ a {
 
 @media (max-width: 480px) {
 
+  /* Hero Carousel tighter rectangle on small mobile */
+  .hero-section {
+    aspect-ratio: 16 / 11.52 !important;
+    max-height: 280px !important;
+  }
+
+  .hero-dots {
+    bottom: 6px !important;
+  }
+
   /* Section headers tighter */
   .section-header-row {
     padding: 0 3.3vw !important;
     flex-direction: row !important;
-    align-items: flex-end !important;
-    justify-content: space-between !important;
-    gap: 2.2vw !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+  }
+
+  .section-header-row.has-view-all .section-title-wrap,
+  .section-header-row.has-view-all > div:first-child {
+    padding: 0 20vw !important;
+    box-sizing: border-box !important;
   }
 
   .section-header-row h2 {
-    font-size: 6.1vw !important;
+    font-size: 17.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    text-align: center !important;
+  }
+
+  .section-header-row .view-all-btn {
+    right: 3.3vw !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
   }
 
   /* Product cards tighter */
@@ -1089,22 +1479,55 @@ a {
   }
 
   .carousel-card {
-    min-width: 56vw !important;
-    max-width: 56vw !important;
-    height: 53vh !important;
+    min-width: 45vw !important;
+    max-width: 45vw !important;
+    height: 43.5vh !important;
+    min-height: 305px !important;
   }
 
   .carousel-card .card-image-area {
-    height: 28vh !important;
+    height: 28.5vh !important;
+    min-height: 195px !important;
   }
 
   .carousel-card .card-title {
-    font-size: 10px !important;
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
     line-height: 1.3 !important;
   }
 
+  .carousel-card .card-desc {
+    display: none !important;
+  }
+
   .carousel-card .card-content {
-    padding: 1.2vh 2.8vw 1.5vh !important;
+    padding: 6px 8px 8px !important;
+  }
+
+  .carousel-card .card-price,
+  .shop-product-card .card-price {
+    font-size: 15.5px !important;
+  }
+
+  .carousel-card .card-original-price,
+  .shop-product-card .card-original-price {
+    font-size: 11px !important;
+  }
+
+  .carousel-card .card-discount-pct,
+  .shop-product-card .card-discount-pct {
+    font-size: 10px !important;
+  }
+
+  .card-add-btn {
+    width: auto !important;
+    height: auto !important;
+    min-width: auto !important;
+    min-height: auto !important;
+    border-radius: 6px !important;
+    padding: 6px 9px !important;
+    font-size: 10.5px !important;
+    letter-spacing: 0.2px !important;
   }
 
   /* Brands — tighter */
@@ -1170,7 +1593,7 @@ a {
   }
 
   .shop-card-image-area {
-    height: 180px !important;
+    height: 205px !important;
   }
 }
 
@@ -1185,7 +1608,7 @@ a {
   }
 
   .shop-card-image-area {
-    height: 150px !important;
+    height: 190px !important;
   }
 }
 
@@ -1255,25 +1678,46 @@ a {
 
 @media (max-width: 768px) {
   .shop-product-card {
-    --card-height: 340px;
+    --card-height: 320px;
   }
 
   .shop-card-image-area {
-    height: 45% !important;
+    height: 61% !important;
+    min-height: 200px !important;
   }
 
   .shop-card-content {
-    padding: 10px 10px 12px !important;
+    padding: 8px 10px 10px !important;
   }
 
   .shop-card-title {
-    font-size: 10px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
     line-height: 1.3 !important;
     margin-bottom: 2px !important;
   }
 
   .shop-card-desc {
     display: none !important;
-    /* Hide description on mobile to keep the card compact */
+    /* Hide description on mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  .shop-product-card {
+    --card-height: 310px;
+  }
+
+  .shop-card-image-area {
+    height: 60% !important;
+    min-height: 190px !important;
+  }
+
+  .shop-card-title {
+    font-size: 14.5px !important;
+  }
+
+  .shop-card-content {
+    padding: 6px 8px 8px !important;
   }
 }
