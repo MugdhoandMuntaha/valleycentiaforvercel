@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Menu, X } from 'lucide-react';
 import { getProductCards, getNavLinks, getSiteSetting } from '@/lib/db/queries';
 import type { NavLinkItem } from '@/lib/db/queries';
@@ -63,24 +63,57 @@ export default function Header() {
         });
     }, []);
 
+    const headerRef = useRef<HTMLElement>(null);
+    const [headerHeight, setHeaderHeight] = useState<number>(0);
+
+    useEffect(() => {
+        const updateHeight = () => {
+            if (headerRef.current) {
+                setHeaderHeight(headerRef.current.offsetHeight);
+            }
+        };
+
+        updateHeight();
+
+        let ro: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined' && headerRef.current) {
+            ro = new ResizeObserver(updateHeight);
+            ro.observe(headerRef.current);
+        }
+
+        window.addEventListener('resize', updateHeight);
+        return () => {
+            if (ro) ro.disconnect();
+            window.removeEventListener('resize', updateHeight);
+        };
+    }, [headerSettings.show_announcement]);
+
+    const hasNavLinks = Boolean(navLinks && navLinks.length > 0);
+
     return (
         <>
-            {/* ===== ROW 1: Announcement Bar ===== */}
-            <AnnouncementBar
-                show={headerSettings.show_announcement}
-                text={headerSettings.announcement_text}
-            />
-
-            {/* ===== ROW 2: Main Header ===== */}
+            {/* ===== Main Fixed Header Section ===== */}
             <header
+                ref={headerRef}
+                className="site-header"
                 style={{
-                    position: 'sticky',
+                    position: 'fixed',
                     top: 0,
+                    left: 0,
+                    right: 0,
+                    width: '100%',
                     zIndex: 1000,
                     background: 'black',
                     borderBottom: '1px solid #2a2a2a',
                 }}
             >
+                {/* ===== ROW 1: Announcement Bar ===== */}
+                <AnnouncementBar
+                    show={headerSettings.show_announcement}
+                    text={headerSettings.announcement_text}
+                />
+
+                {/* ===== ROW 2: Main Header ===== */}
                 <div
                     className="header-inner"
                     style={{
@@ -93,26 +126,28 @@ export default function Header() {
                         gap: '24px',
                     }}
                 >
-                    {/* Mobile Hamburger — left side */}
-                    <button
-                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        className="mobile-menu-btn"
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ffffff',
-                            cursor: 'pointer',
-                            padding: '8px',
-                            display: 'none',
-                            flexShrink: 0,
-                        }}
-                        aria-label="Menu"
-                    >
-                        {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-                    </button>
+                    {/* Mobile Hamburger — left side (only if navigations exist) */}
+                    {hasNavLinks && (
+                        <button
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                            className="mobile-menu-btn"
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ffffff',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                display: 'none',
+                                flexShrink: 0,
+                            }}
+                            aria-label="Menu"
+                        >
+                            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+                        </button>
+                    )}
 
-                    {/* Logo */}
-                    <HeaderLogo />
+                    {/* Logo (left side, shifted 14px to the right) */}
+                    <HeaderLogo style={{ marginLeft: '14px' }} />
 
                     {/* Spacer */}
                     <div style={{ flex: 1 }} />
@@ -134,13 +169,26 @@ export default function Header() {
                 <DesktopNav navLinks={navLinks} />
             </header>
 
-            {/* ===== Mobile Menu Drawer ===== */}
-            <MobileMenu
-                isOpen={mobileMenuOpen}
-                onClose={() => setMobileMenuOpen(false)}
-                navLinks={navLinks}
-                allProducts={allProducts}
+            {/* ===== Preserves layout flow so body starts directly under fixed header ===== */}
+            <div
+                aria-hidden="true"
+                style={{
+                    height: headerHeight > 0 ? `${headerHeight}px` : (headerSettings.show_announcement ? '148px' : '117px'),
+                    visibility: 'hidden',
+                    pointerEvents: 'none',
+                    flexShrink: 0,
+                }}
             />
+
+            {/* ===== Mobile Menu Drawer ===== */}
+            {hasNavLinks && (
+                <MobileMenu
+                    isOpen={mobileMenuOpen}
+                    onClose={() => setMobileMenuOpen(false)}
+                    navLinks={navLinks}
+                    allProducts={allProducts}
+                />
+            )}
         </>
     );
 }

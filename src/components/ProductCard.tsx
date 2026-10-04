@@ -57,7 +57,6 @@ export default function ProductCard({
               borderRadius: '12px',
               border: '1px solid #f0f0f0',
               overflow: 'hidden',
-              scrollSnapAlign: 'start',
               display: 'flex',
               flexDirection: 'column',
               transition: 'box-shadow 0.2s ease, transform 0.2s ease',

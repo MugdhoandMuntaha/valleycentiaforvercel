@@ -30,6 +30,10 @@ export default function DesktopNav({ navLinks }: DesktopNavProps) {
         }, 200);
     }, []);
 
+    if (!navLinks || navLinks.length === 0) {
+        return null;
+    }
+
     return (
         <nav
             className="desktop-nav"

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import "./globals.css";
+import "./globals.css"; // styles
 import { LayoutShell } from "@/components/LayoutShell";
 import ScrollToTop from "@/components/ScrollToTop";
 

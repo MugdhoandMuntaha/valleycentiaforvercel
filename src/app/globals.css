@@ -65,7 +65,7 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -75,7 +75,18 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+.site-header {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #000000;
+  border-bottom: 1px solid #2a2a2a;
+  width: 100%;
 }
 
 h1,
@@ -836,6 +847,27 @@ a {
   margin-bottom: 0 !important;
 }
 
+/* Free-form smooth scrolling for product carousels (no auto-snap) */
+.carousel-scroll-track,
+.vc-scroll-track {
+  scroll-snap-type: none !important;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.carousel-card,
+.vc-card {
+  scroll-snap-align: none !important;
+  scroll-snap-stop: normal !important;
+}
+
+/* Carousel arrow transparent fade when at boundary / scrolled to end */
+.carousel-arrow.is-end {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden;
+}
+
 /* ═══════════════════════════════════════════════════════
    BRAND SCROLLING RIBBON (Under Hero Carousel)
    ═══════════════════════════════════════════════════════ */
@@ -847,51 +879,65 @@ a {
   background: #000000;
   border-top: 1px solid #1a1a1a;
   border-bottom: 1px solid #1a1a1a;
-  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   padding: 6px 0;
   display: flex;
   align-items: center;
   user-select: none;
   z-index: 5;
   -webkit-font-smoothing: antialiased;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
 }
 
-/* Gradient edge fades for seamless smooth entry and exit */
+/* Increased gap between brand ribbon and the next homepage section */
+.brand-ribbon-container + .homepage-section,
+.brand-ribbon-container + section {
+  padding-top: 64px !important;
+}
+
+/* Subtle gradient edge fades for smooth entry and exit */
 .brand-ribbon-container::before,
 .brand-ribbon-container::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 90px;
+  width: 42px;
   z-index: 3;
   pointer-events: none;
 }
 
 .brand-ribbon-container::before {
   left: 0;
-  background: linear-gradient(to right, #000000 35%, rgba(0, 0, 0, 0) 100%);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
 }
 
 .brand-ribbon-container::after {
   right: 0;
-  background: linear-gradient(to left, #000000 35%, rgba(0, 0, 0, 0) 100%);
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Scrollable viewport inside the ribbon container */
+.brand-ribbon-viewport {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+}
+
+.brand-ribbon-viewport:active {
+  cursor: grabbing;
+}
+
+.brand-ribbon-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .brand-ribbon-track {
   display: flex;
   width: max-content;
-  animation: brandRibbonScroll 36s linear infinite;
-  will-change: transform;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-}
-
-.brand-ribbon-track:hover,
-.brand-ribbon-track:active {
-  animation-play-state: paused;
 }
 
 .brand-ribbon-group {
@@ -913,6 +959,8 @@ a {
   margin: 0;
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   outline: none;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .brand-logo-item:hover {
@@ -939,6 +987,8 @@ a {
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
               background 0.25s ease,
               border-color 0.25s ease;
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .brand-logo-item:hover .brand-rect-badge {
@@ -957,6 +1007,9 @@ a {
   background: transparent;
   padding: 0;
   margin: 0;
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
 }
 
 /* Monogram / Brand Name Fallback badge */
@@ -968,6 +1021,7 @@ a {
   justify-content: center;
   padding: 0;
   margin: 0;
+  user-select: none;
 }
 
 .brand-rect-fallback-text {
@@ -983,19 +1037,11 @@ a {
   transition: color 0.2s ease;
   padding: 0;
   margin: 0;
+  user-select: none;
 }
 
 .brand-logo-item:hover .brand-rect-fallback-text {
   color: #c9a96e;
-}
-
-@keyframes brandRibbonScroll {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  100% {
-    transform: translate3d(-50%, 0, 0);
-  }
 }
 
 
@@ -1108,14 +1154,30 @@ a {
     font-size: 2.9vw !important;
   }
 
-  /* Brand scrolling ribbon mobile adjustments */
+  /* Brand scrolling ribbon mobile adjustments - taller ribbon and minimal corner shadows */
   .brand-ribbon-container {
-    padding: 4px 0 !important;
+    padding: 8px 0 !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15) !important;
   }
 
   .brand-ribbon-container::before,
   .brand-ribbon-container::after {
-    width: 36px !important;
+    width: 18px !important;
+    opacity: 0.6 !important;
+  }
+
+  .brand-ribbon-container::before {
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%) !important;
+  }
+
+  .brand-ribbon-container::after {
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%) !important;
+  }
+
+  /* Increased gap between ribbon and next section on mobile */
+  .brand-ribbon-container + .homepage-section,
+  .brand-ribbon-container + section {
+    padding-top: 52px !important;
   }
 
   .brand-logo-item {
@@ -1124,12 +1186,12 @@ a {
   }
 
   .brand-rect-badge {
-    height: 48px !important;
+    height: 64px !important;
     width: auto !important;
-    max-width: 220px !important;
+    max-width: 260px !important;
     padding: 0 !important;
     margin: 0 !important;
-    border-radius: 5px !important;
+    border-radius: 6px !important;
     background: transparent !important;
     border: 1px solid transparent !important;
     box-shadow: none !important;
@@ -1138,18 +1200,18 @@ a {
   .brand-rect-logo-image {
     height: 100% !important;
     width: auto !important;
-    border-radius: 5px !important;
+    border-radius: 6px !important;
     padding: 0 !important;
     margin: 0 !important;
   }
 
   .brand-rect-fallback {
-    padding: 0 10px !important;
+    padding: 0 12px !important;
     margin: 0 !important;
   }
 
   .brand-rect-fallback-text {
-    font-size: 11px !important;
+    font-size: 13px !important;
     color: #f3f3f3 !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -1295,10 +1357,17 @@ a {
     top: 38% !important;
     transform: translateY(-50%) !important;
     touch-action: manipulation;
+    transition: opacity 0.28s ease, transform 0.28s ease !important;
   }
 
   .carousel-arrow-right {
     right: 8px !important;
+  }
+
+  .carousel-arrow-right.is-end {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
   }
 
   .carousel-arrow-left,

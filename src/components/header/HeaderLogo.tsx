@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
-export default function HeaderLogo() {
+interface HeaderLogoProps {
+    style?: React.CSSProperties;
+}
+
+export default function HeaderLogo({ style }: HeaderLogoProps = {}) {
     return (
         <Link
             href="/"
@@ -13,6 +17,7 @@ export default function HeaderLogo() {
                 alignItems: 'center',
                 flexShrink: 0,
                 textDecoration: 'none',
+                ...style,
             }}
         >
             <Image
