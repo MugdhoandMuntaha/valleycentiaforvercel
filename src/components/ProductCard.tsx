@@ -3,19 +3,54 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Star, Heart, Check, ShoppingBag } from 'lucide-react';
+import { Heart, Check, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { SectionProduct } from '@/data/homeSections';
+import type { ProductCard as DbProductCard } from '@/lib/db/queries';
 import { useCart } from '@/lib/CartContext';
 import { useWishlist } from '@/lib/WishlistContext';
 import SizeSelectionModal, { type ProductSize } from '@/components/product/SizeSelectionModal';
 import ProductBadge from '@/components/common/ProductBadge';
 
-interface ProductCardProps {
-    product: SectionProduct;
+export interface ProductCardProps {
+    product: SectionProduct | DbProductCard;
     index?: number;
     isCarousel?: boolean;
     showWishlist?: boolean;
+    className?: string;
+    style?: React.CSSProperties;
+}
+
+/** Normalize any input product (DB ProductCard or SectionProduct) into unified SectionProduct shape */
+function normalizeProduct(raw: any): SectionProduct {
+    if (!raw) return raw;
+    if (raw.title && raw.image !== undefined) {
+        return raw as SectionProduct;
+    }
+    const badges = raw.badges as { badge: string; label: string | null; color: string | null }[] | null;
+    const primaryBadge = badges?.find((b) => b.label) || badges?.[0];
+    const badgeText = raw.custom_badge_text || (primaryBadge ? (primaryBadge.label || primaryBadge.badge).replace(/_/g, ' ').toUpperCase() : undefined);
+    const formatReviewCount = (count: number) => count >= 1000 ? `${(count / 1000).toFixed(1)}K` : String(count);
+
+    return {
+        id: String(raw.id || raw._id),
+        slug: raw.slug || '',
+        image: raw.primary_image_url || raw.image || '/no-image.svg',
+        title: raw.name || raw.title || '',
+        description: raw.short_description || raw.description || '',
+        price: Math.ceil(Number(raw.base_price ?? raw.price ?? 0)),
+        originalPrice: raw.compare_at_price ? Math.ceil(Number(raw.compare_at_price)) : (raw.originalPrice ? Math.ceil(Number(raw.originalPrice)) : undefined),
+        discountPercent: raw.discount_percent !== undefined ? Number(raw.discount_percent) : raw.discountPercent,
+        rating: Number(raw.rating_avg ?? raw.rating ?? 0),
+        reviewCount: typeof raw.review_count === 'number' ? formatReviewCount(raw.review_count) : (raw.reviewCount || '0'),
+        badge: badgeText || raw.badge,
+        badgeColor: raw.custom_badge_color || primaryBadge?.color || raw.badgeColor,
+        inStock: raw.in_stock !== undefined ? raw.in_stock : (raw.inStock !== undefined ? raw.inStock : true),
+        stockQuantity: raw.stock_quantity !== undefined ? raw.stock_quantity : (raw.stockQuantity !== undefined ? raw.stockQuantity : 0),
+        sizes: raw.sizes || null,
+        couponCode: raw.coupon_code || raw.couponCode,
+        couponPrice: raw.coupon_price ? Math.ceil(Number(raw.coupon_price)) : (raw.couponPrice ? Math.ceil(Number(raw.couponPrice)) : undefined),
+    };
 }
 
 export default function ProductCard({
@@ -23,18 +58,21 @@ export default function ProductCard({
     index = 0,
     isCarousel = false,
     showWishlist = false,
+    className = '',
+    style,
 }: ProductCardProps) {
+    const item = normalizeProduct(product);
     const { addToCart } = useCart();
     const { isWishlisted, toggleWishlist } = useWishlist();
 
-    const wishlisted = isWishlisted(String(product.id));
+    const wishlisted = isWishlisted(String(item.id));
 
     // Image fallback state
-    const [imgSrc, setImgSrc] = useState(product.image || '/no-image.svg');
+    const [imgSrc, setImgSrc] = useState(item.image || '/no-image.svg');
 
     useEffect(() => {
-        setImgSrc(product.image || '/no-image.svg');
-    }, [product.image]);
+        setImgSrc(item.image || '/no-image.svg');
+    }, [item.image]);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,8 +82,8 @@ export default function ProductCard({
     // Added feedback state
     const [isAdded, setIsAdded] = useState(false);
 
-    // Handle standard layout widths
-    const cardClassName = isCarousel ? 'carousel-card' : 'shop-product-card';
+    // Unified card classes for homepage, shop, PDP, and cart
+    const cardClassName = `product-card carousel-card ${isCarousel ? 'is-carousel' : 'grid-card shop-product-card'} ${className}`.trim();
 
     // Width/Height logic for Carousel vs Grid
     const cardStyle: React.CSSProperties = isCarousel
@@ -65,9 +103,11 @@ export default function ProductCard({
               color: 'inherit',
               position: 'relative',
               boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+              ...style,
           }
         : {
-              height: 'var(--card-height, 532px)',
+              width: '100%',
+              height: '532px',
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #f0f0f0',
@@ -80,45 +120,46 @@ export default function ProductCard({
               color: 'inherit',
               position: 'relative',
               boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+              ...style,
           };
 
     // Calculate discount percent
-    const discount = product.discountPercent || (product.originalPrice
-        ? Math.ceil(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    const discount = item.discountPercent || (item.originalPrice
+        ? Math.ceil(((item.originalPrice - item.price) / item.originalPrice) * 100)
         : 0);
 
     const handleAddToCartClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (product.inStock === false) return;
+        if (item.inStock === false) return;
 
         // Reset state for modal
-        const defaultSize = product.sizes?.find(s => s.is_default && (s.stockQuantity === undefined || s.stockQuantity > 0))
-            || product.sizes?.find(s => s.stockQuantity === undefined || s.stockQuantity > 0)
-            || product.sizes?.find(s => s.is_default)
-            || product.sizes?.[0]
+        const defaultSize = item.sizes?.find(s => s.is_default && (s.stockQuantity === undefined || s.stockQuantity > 0))
+            || item.sizes?.find(s => s.stockQuantity === undefined || s.stockQuantity > 0)
+            || item.sizes?.find(s => s.is_default)
+            || item.sizes?.[0]
             || null;
-        
+
         setSelectedSize(defaultSize);
         setQuantity(1);
         setIsModalOpen(true);
     };
 
     const handleConfirmAddToCart = () => {
-        const finalPrice = selectedSize ? selectedSize.price : product.price;
+        const finalPrice = selectedSize ? selectedSize.price : item.price;
         const finalOriginalPrice = selectedSize
-            ? (product.discountPercent ? Math.ceil(selectedSize.price / (1 - product.discountPercent / 100)) : selectedSize.price)
-            : product.originalPrice;
+            ? (item.discountPercent ? Math.ceil(selectedSize.price / (1 - item.discountPercent / 100)) : selectedSize.price)
+            : item.originalPrice;
 
         addToCart({
-            id: String(product.id),
-            slug: product.slug,
-            name: product.title,
-            image: product.image,
+            id: String(item.id),
+            slug: item.slug,
+            name: item.title,
+            image: item.image,
             price: finalPrice,
             originalPrice: finalOriginalPrice,
             size: selectedSize ? selectedSize.label : 'Default',
-            stockQuantity: selectedSize ? selectedSize.stockQuantity : product.stockQuantity,
+            stockQuantity: selectedSize ? selectedSize.stockQuantity : item.stockQuantity,
         }, quantity);
 
         setIsAdded(true);
@@ -136,7 +177,7 @@ export default function ProductCard({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.08 }}
-                style={isCarousel ? { display: 'contents' } : undefined}
+                style={{ display: 'contents' }}
             >
                 <div
                     style={cardStyle}
@@ -149,10 +190,10 @@ export default function ProductCard({
                     }}
                 >
                     {/* Top-left Badge */}
-                    {product.badge && (
+                    {item.badge && (
                         <ProductBadge
-                            badge={product.badge}
-                            badgeColor={product.badgeColor}
+                            badge={item.badge}
+                            badgeColor={item.badgeColor}
                             variant="card"
                         />
                     )}
@@ -164,8 +205,9 @@ export default function ProductCard({
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                toggleWishlist(String(product.id));
+                                toggleWishlist(String(item.id));
                             }}
+                            aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                             style={{
                                 position: 'absolute',
                                 top: '10px',
@@ -196,8 +238,8 @@ export default function ProductCard({
 
                     {/* Image Area */}
                     <Link
-                        href={`/product/${product.slug}`}
-                        className={isCarousel ? 'card-image-area' : 'shop-card-image-area'}
+                        href={`/product/${item.slug}`}
+                        className="card-image-area"
                         style={{
                             display: 'block',
                             position: 'relative',
@@ -208,7 +250,7 @@ export default function ProductCard({
                     >
                         <Image
                             src={imgSrc}
-                            alt={product.title}
+                            alt={item.title}
                             fill
                             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                             style={{
@@ -222,7 +264,7 @@ export default function ProductCard({
 
                     {/* Card Content */}
                     <div
-                        className={isCarousel ? 'card-content' : 'shop-card-content'}
+                        className="card-content"
                         style={{
                             padding: '14px 14px 16px',
                             display: 'flex',
@@ -230,48 +272,10 @@ export default function ProductCard({
                             flex: 1,
                         }}
                     >
-                        {/* Rating/Review */}
-                        {!isCarousel && product.rating !== undefined && product.rating > 0 && (
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    marginBottom: '6px',
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '3px',
-                                        fontFamily: "'Inter', sans-serif",
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        color: '#4caf50',
-                                    }}
-                                >
-                                    <Star size={13} fill="#4caf50" stroke="#4caf50" />
-                                    {product.rating}
-                                </span>
-                                {product.reviewCount && (
-                                    <span
-                                        style={{
-                                            fontFamily: "'Inter', sans-serif",
-                                            fontSize: '12px',
-                                            color: '#999',
-                                        }}
-                                    >
-                                        | {product.reviewCount} Reviews
-                                    </span>
-                                )}
-                            </div>
-                        )}
-
                         {/* Title */}
-                        <Link href={`/product/${product.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <Link href={`/product/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                             <h3
-                                className={isCarousel ? 'card-title' : 'shop-card-title'}
+                                className="card-title"
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
                                     fontSize: '18px',
@@ -286,14 +290,14 @@ export default function ProductCard({
                                     textOverflow: 'ellipsis',
                                 }}
                             >
-                                {product.title}
+                                {item.title}
                             </h3>
                         </Link>
 
                         {/* Description */}
-                        {product.description && (
+                        {item.description && (
                             <p
-                                className={isCarousel ? 'card-desc' : 'shop-card-desc'}
+                                className="card-desc"
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
                                     fontSize: '13px',
@@ -308,7 +312,7 @@ export default function ProductCard({
                                     textOverflow: 'ellipsis',
                                 }}
                             >
-                                {product.description}
+                                {item.description}
                             </p>
                         )}
 
@@ -343,11 +347,11 @@ export default function ProductCard({
                                         lineHeight: 1,
                                     }}
                                 >
-                                    ৳{product.price}
+                                    ৳{item.price}
                                 </span>
 
                                 {/* Strikethrough Original Price & Discount Row */}
-                                {((product.originalPrice != null && product.originalPrice > product.price) || discount > 0) && (
+                                {((item.originalPrice != null && item.originalPrice > item.price) || discount > 0) && (
                                     <div
                                         className="card-discount-row"
                                         style={{
@@ -357,7 +361,7 @@ export default function ProductCard({
                                             lineHeight: 1.2,
                                         }}
                                     >
-                                        {product.originalPrice != null && product.originalPrice > product.price && (
+                                        {item.originalPrice != null && item.originalPrice > item.price && (
                                             <span
                                                 className="card-original-price"
                                                 style={{
@@ -368,7 +372,7 @@ export default function ProductCard({
                                                     fontWeight: 400,
                                                 }}
                                             >
-                                                ৳{product.originalPrice}
+                                                ৳{item.originalPrice}
                                             </span>
                                         )}
                                         {discount > 0 && (
@@ -393,17 +397,17 @@ export default function ProductCard({
                             <button
                                 type="button"
                                 className="card-add-btn"
-                                disabled={product.inStock === false}
+                                disabled={item.inStock === false}
                                 onClick={handleAddToCartClick}
-                                aria-label={product.inStock === false ? 'Out of stock' : 'Add to cart'}
+                                aria-label={item.inStock === false ? 'Out of stock' : 'Add to cart'}
                                 style={{
                                     width: '100%',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: '8px',
-                                    background: product.inStock === false ? '#e0e0e0' : (isAdded ? '#1a1a1a' : '#f5c518'),
-                                    color: product.inStock === false ? '#888' : (isAdded ? '#ffffff' : '#1a1a1a'),
+                                    background: item.inStock === false ? '#e0e0e0' : (isAdded ? '#1a1a1a' : '#f5c518'),
+                                    color: item.inStock === false ? '#888' : (isAdded ? '#ffffff' : '#1a1a1a'),
                                     border: 'none',
                                     borderRadius: '8px',
                                     padding: '11px 0',
@@ -411,12 +415,12 @@ export default function ProductCard({
                                     fontSize: '13px',
                                     fontWeight: 700,
                                     letterSpacing: '0.5px',
-                                    cursor: product.inStock === false ? 'not-allowed' : 'pointer',
+                                    cursor: item.inStock === false ? 'not-allowed' : 'pointer',
                                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                                     textTransform: 'uppercase',
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (product.inStock === false) return;
+                                    if (item.inStock === false) return;
                                     if (!isAdded) {
                                         e.currentTarget.style.background = '#e6b800';
                                         e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
@@ -424,7 +428,7 @@ export default function ProductCard({
                                     }
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (product.inStock === false) return;
+                                    if (item.inStock === false) return;
                                     if (!isAdded) {
                                         e.currentTarget.style.background = '#f5c518';
                                         e.currentTarget.style.transform = 'translateY(0) scale(1)';
@@ -432,7 +436,7 @@ export default function ProductCard({
                                     }
                                 }}
                             >
-                                {product.inStock === false ? (
+                                {item.inStock === false ? (
                                     <span className="card-btn-text">OUT OF STOCK</span>
                                 ) : isAdded ? (
                                     <>
@@ -451,11 +455,11 @@ export default function ProductCard({
                 </div>
             </motion.div>
 
-            {/* Size Selection Modal (Extracted component - SRP) */}
+            {/* Size Selection Modal */}
             <SizeSelectionModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                product={product}
+                product={item}
                 selectedSize={selectedSize}
                 onSelectSize={setSelectedSize}
                 quantity={quantity}

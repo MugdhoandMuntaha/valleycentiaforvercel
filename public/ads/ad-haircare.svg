@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 700">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c9b3e8"/>
+      <stop offset="50%" style="stop-color:#b89ad6"/>
+      <stop offset="100%" style="stop-color:#a682c4"/>
+    </linearGradient>
+    <linearGradient id="podium" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4bfe8"/>
+      <stop offset="100%" style="stop-color:#b99dd4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.2)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
+    </radialGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+    <filter id="glow-text">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1600" height="700" fill="url(#bg)"/>
+  <rect width="1600" height="700" fill="url(#glow)"/>
+  
+  <!-- Decorative circles -->
+  <circle cx="1350" cy="120" r="80" fill="rgba(255,255,255,0.08)"/>
+  <circle cx="1420" cy="200" r="50" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="200" cy="600" r="120" fill="rgba(255,255,255,0.05)"/>
+  
+  <!-- Sparkle decorations -->
+  <text x="680" y="180" font-size="28" fill="rgba(255,255,255,0.7)">✦</text>
+  <text x="520" y="280" font-size="20" fill="rgba(255,255,255,0.5)">✧</text>
+  <text x="750" y="130" font-size="16" fill="rgba(255,255,255,0.4)">✦</text>
+  
+  <!-- Podiums -->
+  <ellipse cx="1050" cy="580" rx="220" ry="40" fill="url(#podium)" opacity="0.6"/>
+  <rect x="960" y="380" width="180" height="200" rx="8" fill="url(#podium)" opacity="0.5" filter="url(#shadow)"/>
+  <ellipse cx="1250" cy="560" rx="160" ry="30" fill="url(#podium)" opacity="0.5"/>
+  <rect x="1170" y="400" width="160" height="160" rx="8" fill="url(#podium)" opacity="0.4" filter="url(#shadow)"/>
+  <ellipse cx="850" cy="590" rx="140" ry="28" fill="url(#podium)" opacity="0.4"/>
+  <rect x="780" y="430" width="140" height="160" rx="8" fill="url(#podium)" opacity="0.35" filter="url(#shadow)"/>
+  
+  <!-- Product bottles (simplified) -->
+  <!-- Bottle 1 -->
+  <rect x="990" y="240" width="60" height="160" rx="10" fill="#e8d4f0" filter="url(#shadow)"/>
+  <rect x="1000" y="230" width="40" height="20" rx="4" fill="#d4bfe8"/>
+  <rect x="1010" y="215" width="20" height="20" rx="3" fill="#c9a0d8"/>
+  <rect x="1005" y="270" width="30" height="50" rx="4" fill="white" opacity="0.7"/>
+  
+  <!-- Bottle 2 -->
+  <rect x="1100" y="280" width="55" height="130" rx="10" fill="#f0e0f5" filter="url(#shadow)"/>
+  <rect x="1108" y="270" width="38" height="18" rx="4" fill="#e8d4f0"/>
+  <rect x="1118" y="255" width="18" height="20" rx="3" fill="#d88ae0"/>
+  <rect x="1112" y="300" width="28" height="45" rx="4" fill="white" opacity="0.7"/>
+  
+  <!-- Bottle 3 -->
+  <rect x="1210" y="260" width="65" height="150" rx="12" fill="#f5e8fa" filter="url(#shadow)"/>
+  <rect x="1222" y="248" width="40" height="20" rx="4" fill="#e0c8ec"/>
+  <rect x="1232" y="232" width="20" height="22" rx="3" fill="#c080d0"/>
+  <rect x="1225" y="285" width="32" height="55" rx="4" fill="white" opacity="0.7"/>
+  
+  <!-- Marigold flowers -->
+  <g transform="translate(880,550)">
+    <circle cx="0" cy="0" r="18" fill="#e8a020"/>
+    <circle cx="0" cy="-15" r="8" fill="#f0c040"/>
+    <circle cx="13" cy="-7" r="8" fill="#f0c040"/>
+    <circle cx="13" cy="7" r="8" fill="#f0c040"/>
+    <circle cx="0" cy="15" r="8" fill="#f0c040"/>
+    <circle cx="-13" cy="7" r="8" fill="#f0c040"/>
+    <circle cx="-13" cy="-7" r="8" fill="#f0c040"/>
+    <circle cx="0" cy="0" r="10" fill="#e89020"/>
+  </g>
+  <g transform="translate(1350,520) scale(0.7)">
+    <circle cx="0" cy="0" r="18" fill="#e8a020"/>
+    <circle cx="0" cy="-15" r="8" fill="#f0c040"/>
+    <circle cx="13" cy="-7" r="8" fill="#f0c040"/>
+    <circle cx="13" cy="7" r="8" fill="#f0c040"/>
+    <circle cx="0" cy="15" r="8" fill="#f0c040"/>
+    <circle cx="-13" cy="7" r="8" fill="#f0c040"/>
+    <circle cx="-13" cy="-7" r="8" fill="#f0c040"/>
+    <circle cx="0" cy="0" r="10" fill="#e89020"/>
+  </g>
+  
+  <!-- Title text -->
+  <text x="100" y="280" font-family="Georgia, serif" font-size="72" font-weight="bold" fill="white" filter="url(#glow-text)">Healthy Hair</text>
+  <text x="120" y="380" font-family="'Brush Script MT', 'Segoe Script', cursive" font-size="90" fill="white" font-style="italic" filter="url(#glow-text)">Starts Here</text>
+  
+  <!-- Subtitle -->
+  <text x="120" y="440" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.8)" letter-spacing="3">PREMIUM HAIR CARE COLLECTION</text>
+  
+  <!-- Shop now text -->
+  <text x="120" y="490" font-family="Arial, sans-serif" font-size="20" fill="white" font-weight="bold" letter-spacing="2">SHOP NOW →</text>
+</svg>

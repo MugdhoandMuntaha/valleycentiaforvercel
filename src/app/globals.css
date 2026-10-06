@@ -1081,7 +1081,7 @@ a {
     padding: 0 24px !important;
   }
 
-  .carousel-card {
+  .carousel-card.is-carousel {
     min-width: calc((100% - 60px) / 3.17) !important;
     max-width: calc((100% - 60px) / 3.17) !important;
   }
@@ -1236,9 +1236,18 @@ a {
     gap: 2.9vw !important;
   }
 
-  .carousel-card {
+  .carousel-card.is-carousel {
     min-width: 45vw !important;
     max-width: 45vw !important;
+  }
+
+  .carousel-card.grid-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .carousel-card {
     height: 43.5vh !important;
     min-height: 315px !important;
   }
@@ -1249,11 +1258,11 @@ a {
   }
 
   .carousel-card .card-content {
-    padding: 8px 10px 10px !important;
+    padding: clamp(6px, 1.5vw, 8px) clamp(7px, 1.8vw, 10px) 10px !important;
   }
 
   .carousel-card .card-title {
-    font-size: 15px !important;
+    font-size: clamp(12.5px, 2.2vw, 15px) !important;
     font-weight: 600 !important;
     line-height: 1.3 !important;
     margin-bottom: 2px !important;
@@ -1269,7 +1278,7 @@ a {
     flex-direction: row !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 8px !important;
+    gap: clamp(4px, 1.2vw, 8px) !important;
     width: 100% !important;
     margin-top: auto !important;
     padding-top: 4px !important;
@@ -1280,22 +1289,23 @@ a {
     display: flex !important;
     flex-direction: column !important;
     align-items: flex-start !important;
-    gap: 2px !important;
+    gap: 1.5px !important;
     min-width: 0 !important;
-    flex: 1 !important;
+    flex: 1 1 auto !important;
   }
 
   .card-discount-row {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    flex-wrap: nowrap !important;
+    gap: clamp(2.5px, 0.8vw, 5px) !important;
+    flex-wrap: wrap !important;
+    row-gap: 1px !important;
     line-height: 1.2 !important;
   }
 
   .carousel-card .card-price,
   .shop-product-card .card-price {
-    font-size: 16.5px !important;
+    font-size: clamp(13.5px, 2.5vw, 16.5px) !important;
     font-weight: 700 !important;
     color: #1a1a1a !important;
     line-height: 1.15 !important;
@@ -1304,14 +1314,14 @@ a {
 
   .carousel-card .card-original-price,
   .shop-product-card .card-original-price {
-    font-size: 12px !important;
+    font-size: clamp(9.5px, 1.8vw, 12px) !important;
     color: #9ca3af !important;
     white-space: nowrap !important;
   }
 
   .carousel-card .card-discount-pct,
   .shop-product-card .card-discount-pct {
-    font-size: 11px !important;
+    font-size: clamp(8.5px, 1.6vw, 11px) !important;
     font-weight: 700 !important;
     color: #4caf50 !important;
     white-space: nowrap !important;
@@ -1330,10 +1340,10 @@ a {
     height: auto !important;
     min-width: auto !important;
     min-height: auto !important;
-    padding: 7px 11px !important;
-    font-size: 11px !important;
+    padding: clamp(5px, 1.2vw, 7px) clamp(6px, 1.6vw, 11px) !important;
+    font-size: clamp(9px, 1.6vw, 11px) !important;
     font-weight: 700 !important;
-    letter-spacing: 0.3px !important;
+    letter-spacing: clamp(0.05px, 0.05vw, 0.3px) !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     border-radius: 6px !important;
@@ -1547,9 +1557,18 @@ a {
     gap: 2.8vw !important;
   }
 
-  .carousel-card {
+  .carousel-card.is-carousel {
     min-width: 45vw !important;
     max-width: 45vw !important;
+  }
+
+  .carousel-card.grid-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .carousel-card {
     height: 43.5vh !important;
     min-height: 305px !important;
   }
@@ -1560,7 +1579,7 @@ a {
   }
 
   .carousel-card .card-title {
-    font-size: 14.5px !important;
+    font-size: clamp(12px, 3.4vw, 13.5px) !important;
     font-weight: 600 !important;
     line-height: 1.3 !important;
   }
@@ -1570,22 +1589,32 @@ a {
   }
 
   .carousel-card .card-content {
-    padding: 6px 8px 8px !important;
+    padding: 6px clamp(5px, 1.5vw, 8px) 8px !important;
   }
 
   .carousel-card .card-price,
   .shop-product-card .card-price {
-    font-size: 15.5px !important;
+    font-size: clamp(12.5px, 3.6vw, 14.5px) !important;
   }
 
   .carousel-card .card-original-price,
   .shop-product-card .card-original-price {
-    font-size: 11px !important;
+    font-size: clamp(9px, 2.5vw, 10.5px) !important;
   }
 
   .carousel-card .card-discount-pct,
   .shop-product-card .card-discount-pct {
-    font-size: 10px !important;
+    font-size: clamp(8px, 2.2vw, 9.5px) !important;
+  }
+
+  .card-discount-row {
+    gap: clamp(2px, 0.8vw, 3.5px) !important;
+    flex-wrap: wrap !important;
+    row-gap: 1px !important;
+  }
+
+  .card-bottom-area {
+    gap: clamp(3px, 1.2vw, 6px) !important;
   }
 
   .card-add-btn {
@@ -1594,9 +1623,9 @@ a {
     min-width: auto !important;
     min-height: auto !important;
     border-radius: 6px !important;
-    padding: 6px 9px !important;
-    font-size: 10.5px !important;
-    letter-spacing: 0.2px !important;
+    padding: 5px clamp(5px, 1.4vw, 7px) !important;
+    font-size: clamp(8.5px, 2.3vw, 10px) !important;
+    letter-spacing: 0.1px !important;
   }
 
   /* Brands — tighter */
@@ -1740,53 +1769,55 @@ a {
   animation: shimmer 1.5s infinite linear !important;
 }
 
-/* ===== Responsive Shop Card height and spacing ===== */
-.shop-product-card {
-  --card-height: 532px;
+/* ===== Unified Product Card Grid Styles ===== */
+.grid-card,
+.carousel-card.grid-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
-@media (max-width: 768px) {
-  .shop-product-card {
-    --card-height: 320px;
-  }
-
-  .shop-card-image-area {
-    height: 61% !important;
-    min-height: 200px !important;
-  }
-
+@media (max-width: 375px) {
+  .carousel-card .card-content,
   .shop-card-content {
-    padding: 8px 10px 10px !important;
+    padding: 5px 6px 7px !important;
   }
 
+  .carousel-card .card-title,
   .shop-card-title {
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    line-height: 1.3 !important;
+    font-size: 11.5px !important;
+    line-height: 1.25 !important;
     margin-bottom: 2px !important;
   }
 
-  .shop-card-desc {
-    display: none !important;
-    /* Hide description on mobile */
-  }
-}
-
-@media (max-width: 480px) {
-  .shop-product-card {
-    --card-height: 310px;
+  .carousel-card .card-price,
+  .shop-product-card .card-price {
+    font-size: 12.5px !important;
   }
 
-  .shop-card-image-area {
-    height: 60% !important;
-    min-height: 190px !important;
+  .carousel-card .card-original-price,
+  .shop-product-card .card-original-price {
+    font-size: 9px !important;
   }
 
-  .shop-card-title {
-    font-size: 14.5px !important;
+  .carousel-card .card-discount-pct,
+  .shop-product-card .card-discount-pct {
+    font-size: 8px !important;
   }
 
-  .shop-card-content {
-    padding: 6px 8px 8px !important;
+  .card-bottom-area {
+    gap: 3px !important;
+  }
+
+  .card-discount-row {
+    gap: 2px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .card-add-btn {
+    padding: 4px 5px !important;
+    font-size: 8.5px !important;
+    letter-spacing: 0 !important;
+    border-radius: 5px !important;
   }
 }

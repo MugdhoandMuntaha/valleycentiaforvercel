@@ -2,6 +2,7 @@ import HeroCarousel from '@/components/HeroCarousel';
 import BrandScrollingRibbon from '@/components/BrandScrollingRibbon';
 import ProductCarouselSection from '@/components/ProductCarouselSection';
 import BrandsThatLead from '@/components/BrandsThatLead';
+import AdBannerGrid from '@/components/AdBannerGrid';
 import { getHeroSlides, getHomepageSections, getBrands } from '@/lib/db/queries';
 import type { SectionProductCard } from '@/lib/db/queries';
 import type { SectionProduct } from '@/data/homeSections';
@@ -98,17 +99,26 @@ export default async function HomePage() {
 
         if (section.section_type === 'brands_that_lead') {
           return (
-            <BrandsThatLead
-              key={section.id}
-              brands={brandCards}
-              background={section.background_color || '#f9f9f6'}
-            />
+            <div key={section.id}>
+              <AdBannerGrid />
+              <BrandsThatLead
+                brands={brandCards}
+                background={section.background_color || '#f9f9f6'}
+              />
+            </div>
           );
         }
 
 
 
         // Default to ProductCarouselSection for other types (best_sellers, new_launches, power_care_duos, custom)
+        const sectionSlug = section.section_type && section.section_type !== 'custom'
+          ? section.section_type
+          : section.id;
+        const viewAllUrl = (section.cta_link && section.cta_link !== '/shop' && section.cta_link !== '/shop/')
+          ? section.cta_link
+          : `/shop?section=${sectionSlug}`;
+
         return (
           <ProductCarouselSection
             key={section.id}
@@ -116,7 +126,7 @@ export default async function HomePage() {
             subtitle={section.subtitle || ''}
             products={section.products.map(toSectionProduct)}
             background={section.background_color || DEFAULT_BACKGROUNDS[index % DEFAULT_BACKGROUNDS.length]}
-            viewAllHref={section.cta_link || `/shop?section=${section.section_type}`}
+            viewAllHref={viewAllUrl}
           />
         );
       })}

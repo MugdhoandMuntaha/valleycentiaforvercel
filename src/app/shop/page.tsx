@@ -6,8 +6,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Star, ArrowLeft, Filter, Check } from 'lucide-react';
 import { useCart } from '@/lib/CartContext';
-import { getProductCards } from '@/lib/db/queries';
-import type { ProductCard as DbProductCard } from '@/lib/db/queries';
+import { getProductCards, getHomepageSections } from '@/lib/db/queries';
+import type { ProductCard as DbProductCard, HomepageSectionData } from '@/lib/db/queries';
+import { bestSellerProducts, newLaunchProducts, powerCareDuoProducts } from '@/data/homeSections';
 import type { SectionProduct } from '@/data/homeSections';
 import ProductCard from '@/components/ProductCard';
 
@@ -47,9 +48,13 @@ function supabaseToTagged(p: DbProductCard): TaggedProduct {
     };
 }
 
-/* ─── Category config (labels only, products fetched from Supabase) ─── */
+/* ─── Category config (labels only, products fetched from DB) ─── */
 const categoryLabels: Record<string, { label: string; subtitle: string }> = {
     'best-sellers': {
+        label: 'Best Sellers Across Brands',
+        subtitle: 'The most-loved essentials, all in one place',
+    },
+    'best_sellers': {
         label: 'Best Sellers Across Brands',
         subtitle: 'The most-loved essentials, all in one place',
     },
@@ -57,7 +62,15 @@ const categoryLabels: Record<string, { label: string; subtitle: string }> = {
         label: 'Power Care Duos',
         subtitle: 'Essentials that work from root to glow',
     },
+    'power_care_duos': {
+        label: 'Power Care Duos',
+        subtitle: 'Essentials that work from root to glow',
+    },
     'new-launches': {
+        label: 'New Launches',
+        subtitle: 'New formulas to love every day',
+    },
+    'new_launches': {
         label: 'New Launches',
         subtitle: 'New formulas to love every day',
     },
@@ -112,28 +125,79 @@ const skinCareTypes = ['face-wash', 'moisturizer', 'serum', 'toner', 'face-mask'
 const sunCareTypes = ['sunscreen', 'after-sun', 'spf-moisturizer', 'lip-spf'];
 
 /* ─── Helper: filter + sort ─── */
-function resolveProducts(allProducts: TaggedProduct[], params: {
-    category?: string;
-    brand?: string;
-    concern?: string;
-    type?: string;
-    sort?: string;
-}): { label: string; subtitle: string; products: TaggedProduct[]; activeFilter: string } {
-    const { category, brand, concern, type, sort } = params;
+function resolveProducts(
+    allProducts: TaggedProduct[],
+    params: {
+        section?: string;
+        category?: string;
+        brand?: string;
+        concern?: string;
+        type?: string;
+        sort?: string;
+    },
+    sections: HomepageSectionData[] = []
+): { label: string; subtitle: string; products: TaggedProduct[]; activeFilter: string } {
+    const { section, category, brand, concern, type, sort } = params;
 
-    // Category filter
-    if (category && categoryLabels[category]) {
-        return {
-            ...categoryLabels[category],
-            products: allProducts, // All products are already fetched, no separate filter needed
-            activeFilter: categoryLabels[category].label,
-        };
-    }
+    const targetSectionKey = (section || category || '').trim();
+    const normalizedTarget = targetSectionKey.toLowerCase().replace(/_/g, '-');
 
     let products = [...allProducts];
     let label = 'All Products';
     let subtitle = 'Browse our complete collection';
     let activeFilter = '';
+
+    // ── 1. Section / Category Filtering ──
+    if (targetSectionKey) {
+        // Find matching section in database
+        const matchedSection = sections.find((s) => {
+            if (s.id === targetSectionKey) return true;
+            const sType = (s.section_type || '').toLowerCase().replace(/_/g, '-');
+            if (sType === normalizedTarget) return true;
+            const sTitleSlug = s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            if (sTitleSlug === normalizedTarget) return true;
+            return false;
+        });
+
+        if (matchedSection) {
+            label = matchedSection.title;
+            subtitle = matchedSection.subtitle || categoryLabels[normalizedTarget]?.subtitle || 'Curated essentials for you';
+            activeFilter = matchedSection.title;
+
+            if (matchedSection.products && matchedSection.products.length > 0) {
+                const allProductsMap = new Map(allProducts.map((p) => [String(p.id), p]));
+                products = matchedSection.products
+                    .map((sp) => allProductsMap.get(String(sp.id)) || supabaseToTagged(sp))
+                    .filter(Boolean);
+            } else {
+                products = allProducts.filter((p) => {
+                    const badge = (p.badge || '').toLowerCase();
+                    if (normalizedTarget === 'best-sellers') return badge.includes('best seller') || badge.includes('bestseller');
+                    if (normalizedTarget === 'new-launches') return badge.includes('new launch') || badge.includes('new');
+                    if (normalizedTarget === 'power-care-duos') return p.title.toLowerCase().includes('duo');
+                    return false;
+                });
+            }
+        } else {
+            // Fallback if section wasn't in DB or sections still loading
+            if (categoryLabels[normalizedTarget]) {
+                label = categoryLabels[normalizedTarget].label;
+                subtitle = categoryLabels[normalizedTarget].subtitle;
+                activeFilter = label;
+            }
+
+            if (normalizedTarget === 'best-sellers') {
+                const filtered = allProducts.filter((p) => (p.badge || '').toLowerCase().includes('best seller'));
+                products = filtered.length > 0 ? filtered : (bestSellerProducts as unknown as TaggedProduct[]);
+            } else if (normalizedTarget === 'new-launches') {
+                const filtered = allProducts.filter((p) => (p.badge || '').toLowerCase().includes('new launch'));
+                products = filtered.length > 0 ? filtered : (newLaunchProducts as unknown as TaggedProduct[]);
+            } else if (normalizedTarget === 'power-care-duos') {
+                const filtered = allProducts.filter((p) => p.title.toLowerCase().includes('duo'));
+                products = filtered.length > 0 ? filtered : (powerCareDuoProducts as unknown as TaggedProduct[]);
+            }
+        }
+    }
 
     // Brand filter
     if (brand) {
@@ -266,6 +330,7 @@ export default function ShopPage() {
 
 function ShopContent() {
     const searchParams = useSearchParams();
+    const section = searchParams.get('section') || '';
     const category = searchParams.get('category') || '';
     const brand = searchParams.get('brand') || '';
     const concern = searchParams.get('concern') || '';
@@ -274,38 +339,79 @@ function ShopContent() {
     const { addToCart } = useCart();
 
     const [allProducts, setAllProducts] = useState<TaggedProduct[]>([]);
+    const [sections, setSections] = useState<HomepageSectionData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch products from Supabase on mount
+    // Fetch products and homepage sections on mount
     useEffect(() => {
         setIsLoading(true);
-        getProductCards().then((data) => {
-            setAllProducts(data.map(supabaseToTagged));
+        Promise.all([
+            getProductCards().catch(() => []),
+            getHomepageSections().catch(() => []),
+        ]).then(([prodData, secData]) => {
+            setAllProducts(prodData.map(supabaseToTagged));
+            setSections(secData);
             setIsLoading(false);
-        }).catch(() => setIsLoading(false));
+        }).catch(() => {
+            setIsLoading(false);
+        });
     }, []);
 
     const filterParams = useMemo(
         () => ({
+            section: section || undefined,
             category: category || undefined,
             brand: brand || undefined,
             concern: concern || undefined,
             type: type || undefined,
             sort: sort || undefined,
         }),
-        [category, brand, concern, type, sort]
+        [section, category, brand, concern, type, sort]
     );
 
     const { label, subtitle, products, activeFilter } = useMemo(
-        () => resolveProducts(allProducts, filterParams),
-        [allProducts, filterParams]
+        () => resolveProducts(allProducts, filterParams, sections),
+        [allProducts, filterParams, sections]
     );
 
     const quickFilters = useMemo(() => getQuickFilters(filterParams), [filterParams]);
 
-    const hasActiveFilter = !!(category || brand || concern || type || sort);
+    const activeSectionKey = (section || category || '').toLowerCase().replace(/_/g, '-');
+    const hasActiveFilter = !!(activeSectionKey || brand || concern || type || sort);
 
-    const categoryKeys = Object.keys(categoryLabels);
+    const categoryPills = useMemo(() => {
+        const productSections = sections.filter(
+            (s) => s.products && s.products.length > 0 && !['hero_carousel', 'brands_that_lead', 'visible_change'].includes(s.section_type)
+        );
+
+        if (productSections.length > 0) {
+            return productSections.map((s) => {
+                const normType = (s.section_type || '').toLowerCase().replace(/_/g, '-');
+                const normTitle = s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const isActive = Boolean(
+                    activeSectionKey &&
+                    (activeSectionKey === s.id ||
+                     activeSectionKey === normType ||
+                     activeSectionKey === normTitle)
+                );
+                const querySlug = s.section_type && s.section_type !== 'custom' ? s.section_type : s.id;
+                return {
+                    key: s.id,
+                    href: `/shop?section=${querySlug}`,
+                    label: s.title,
+                    active: isActive,
+                };
+            });
+        }
+
+        const defaultKeys = ['best-sellers', 'power-care-duos', 'new-launches'];
+        return defaultKeys.map((key) => ({
+            key,
+            href: `/shop?section=${key.replace(/-/g, '_')}`,
+            label: categoryLabels[key]?.label || key,
+            active: activeSectionKey === key,
+        }));
+    }, [sections, activeSectionKey]);
 
     return (
         <div style={{ minHeight: '100vh', background: '#fafafa' }}>
@@ -414,10 +520,10 @@ function ShopContent() {
 
                     {/* Show category pills if no specific filter is active */}
                     {!brand && !concern && !type && !sort &&
-                        categoryKeys.map((key) => (
+                        categoryPills.map((pill) => (
                             <Link
-                                key={key}
-                                href={`/shop?category=${key}`}
+                                key={pill.key}
+                                href={pill.href}
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
                                     fontSize: '13px',
@@ -425,15 +531,15 @@ function ShopContent() {
                                     padding: '8px 20px',
                                     borderRadius: '20px',
                                     border: '1px solid',
-                                    borderColor: category === key ? '#1a1a1a' : '#e0e0e0',
-                                    background: category === key ? '#1a1a1a' : '#ffffff',
-                                    color: category === key ? '#ffffff' : '#555',
+                                    borderColor: pill.active ? '#1a1a1a' : '#e0e0e0',
+                                    background: pill.active ? '#1a1a1a' : '#ffffff',
+                                    color: pill.active ? '#ffffff' : '#555',
                                     textDecoration: 'none',
                                     transition: 'all 0.2s ease',
                                     cursor: 'pointer',
                                 }}
                             >
-                                {categoryLabels[key].label}
+                                {pill.label}
                             </Link>
                         ))}
 

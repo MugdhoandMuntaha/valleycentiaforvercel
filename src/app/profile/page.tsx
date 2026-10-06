@@ -18,7 +18,8 @@ import {
     getUserAddresses, createAddress, updateAddress, deleteAddress,
     getUserOrders, getUserOrderCount, getWishlistProducts,
 } from '@/lib/db/queries';
-import type { UserAddress, AddressFormData, UserOrder, ProductCard } from '@/lib/db/queries';
+import type { UserAddress, AddressFormData, UserOrder, ProductCard as ProductCardType } from '@/lib/db/queries';
+import ProductCard from '@/components/ProductCard';
 
 /* ===== Tab types ===== */
 type Tab = 'profile' | 'orders' | 'wishlist' | 'addresses' | 'security';
@@ -69,7 +70,7 @@ export default function ProfilePage() {
     const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
     /* ===== Wishlist ===== */
-    const [wishlistProducts, setWishlistProducts] = useState<ProductCard[]>([]);
+    const [wishlistProducts, setWishlistProducts] = useState<ProductCardType[]>([]);
     const [wishlistLoading, setWishlistLoading] = useState(false);
 
     /* ===== Password ===== */
@@ -543,114 +544,22 @@ export default function ProfilePage() {
                                     </Link>
                                 </div>
                             ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                                    {wishlistProducts.map(product => (
-                                        <div key={product.id} style={{
-                                            borderRadius: 14, border: '1px solid #f0f0f0',
-                                            overflow: 'hidden', background: '#fafafa',
-                                            transition: 'all 0.2s',
-                                        }}>
-                                            {/* Product Image */}
-                                            <Link href={`/product/${product.slug}`} style={{ textDecoration: 'none' }}>
-                                                <div style={{ position: 'relative', height: 180, background: '#f5f5f0' }}>
-                                                    {product.primary_image_url ? (
-                                                        <Image
-                                                            src={product.primary_image_url}
-                                                            alt={product.name}
-                                                            fill
-                                                            sizes="200px"
-                                                            style={{ objectFit: 'cover' }}
-                                                        />
-                                                    ) : (
-                                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>
-                                                            <Package size={32} />
-                                                        </div>
-                                                    )}
-                                                    {product.discount_percent > 0 && (
-                                                        <span style={{
-                                                            position: 'absolute', top: 8, left: 8,
-                                                            fontSize: 10, fontWeight: 700, color: '#fff',
-                                                            background: '#ef4444', padding: '2px 7px',
-                                                            borderRadius: 5,
-                                                        }}>
-                                                            {Math.ceil(product.discount_percent)}% OFF
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </Link>
-
-                                            {/* Product Info */}
-                                            <div style={{ padding: '12px 14px' }}>
-                                                <Link href={`/product/${product.slug}`} style={{ textDecoration: 'none' }}>
-                                                    <p style={{
-                                                        fontSize: 13, fontWeight: 600, color: '#1a1a1a',
-                                                        margin: '0 0 4px', lineHeight: 1.3,
-                                                        overflow: 'hidden', textOverflow: 'ellipsis',
-                                                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                                                    }}>
-                                                        {product.name}
-                                                    </p>
-                                                </Link>
-
-                                                {/* Rating */}
-                                                {product.rating_avg > 0 && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                                                        <Star size={11} fill="#ffb700" stroke="#ffb700" />
-                                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#ffb700' }}>{product.rating_avg}</span>
-                                                        <span style={{ fontSize: 10, color: '#bbb' }}>({product.review_count})</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Price */}
-                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
-                                                    <span style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>
-                                                        ৳{product.base_price.toLocaleString()}
-                                                    </span>
-                                                    {product.compare_at_price && product.compare_at_price > product.base_price && (
-                                                        <span style={{ fontSize: 12, color: '#bbb', textDecoration: 'line-through' }}>
-                                                            ৳{product.compare_at_price.toLocaleString()}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Action Buttons */}
-                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button
-                                                        onClick={() => {
-                                                            addToCart({
-                                                                id: product.id,
-                                                                slug: product.slug,
-                                                                name: product.name,
-                                                                image: product.primary_image_url || '',
-                                                                price: Math.ceil(product.base_price),
-                                                                originalPrice: product.compare_at_price ? Math.ceil(product.compare_at_price) : undefined,
-                                                            });
-                                                        }}
-                                                        style={{
-                                                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                                                            padding: '8px 0', background: '#1a1a1a', color: '#f5c518',
-                                                            border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                                                            cursor: 'pointer', fontFamily: "'Inter', sans-serif",
-                                                            textTransform: 'uppercase', letterSpacing: 0.3,
-                                                        }}
-                                                    >
-                                                        Add to Cart
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleWishlist(product.id)}
-                                                        style={{
-                                                            width: 36, height: 36, display: 'flex', alignItems: 'center',
-                                                            justifyContent: 'center', background: '#fff',
-                                                            border: '1px solid #f0f0f0', borderRadius: 8,
-                                                            cursor: 'pointer',
-                                                        }}
-                                                        title="Remove from wishlist"
-                                                    >
-                                                        <Trash2 size={14} color="#ef4444" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div
+                                    className="products-grid"
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                                        gap: 20,
+                                    }}
+                                >
+                                    {wishlistProducts.map((product, index) => (
+                                        <ProductCard
+                                            key={product.id}
+                                            product={product}
+                                            index={index}
+                                            isCarousel={false}
+                                            showWishlist={true}
+                                        />
                                     ))}
                                 </div>
                             )}
