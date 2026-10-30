@@ -5,6 +5,7 @@ import Product from '@/lib/models/Product';
 import Brand from '@/lib/models/Brand';
 import Category from '@/lib/models/Category';
 import ProductCoupon from '@/lib/models/ProductCoupon';
+import { safeCache } from '@/lib/cache';
 import { toProductCard, attachCouponsToCards, mapProductsToCards } from './helpers';
 import type { ProductCard, ProductDetail, ProductFilters, AISearchParams } from './types';
 
@@ -12,7 +13,7 @@ import type { ProductCard, ProductDetail, ProductFilters, AISearchParams } from 
 // PRODUCT CARDS (shop page)
 // ============================================================================
 
-export async function getProductCards(filters?: ProductFilters): Promise<ProductCard[]> {
+async function fetchProductCards(filters?: ProductFilters): Promise<ProductCard[]> {
     await connectToDatabase();
 
     const query: Record<string, unknown> = { isActive: true, isDeleted: { $ne: true } };
@@ -72,11 +73,24 @@ export async function getProductCards(filters?: ProductFilters): Promise<Product
     return attachCouponsToCards(mapProductsToCards(products as unknown as Record<string, unknown>[]));
 }
 
+const cachedDefaultProductCards = safeCache(
+    () => fetchProductCards(),
+    ['product-cards-default'],
+    { tags: ['products'], revalidate: 3600 }
+);
+
+export async function getProductCards(filters?: ProductFilters): Promise<ProductCard[]> {
+    if (!filters || Object.keys(filters).length === 0) {
+        return cachedDefaultProductCards();
+    }
+    return fetchProductCards(filters);
+}
+
 // ============================================================================
 // PRODUCT DETAIL (PDP)
 // ============================================================================
 
-export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+async function fetchProductBySlug(slug: string): Promise<ProductDetail | null> {
     await connectToDatabase();
 
     const product = await Product.findOne({ slug, isDeleted: { $ne: true } })
@@ -151,6 +165,15 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         coupon_price,
         coupon_code,
     };
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+    const cached = safeCache(
+        () => fetchProductBySlug(slug),
+        ['product-by-slug', slug],
+        { tags: ['products', 'product:' + slug], revalidate: 3600 }
+    );
+    return cached();
 }
 
 // ============================================================================

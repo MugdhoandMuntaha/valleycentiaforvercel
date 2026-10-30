@@ -6,6 +6,7 @@ import Order from '@/lib/models/Order';
 import Product from '@/lib/models/Product';
 import User from '@/lib/models/User';
 import CartItem from '@/lib/models/CartItem';
+import { notifyStorefront } from '@/lib/sync';
 
 // Prevent tree-shaking from removing these models so they register in Mongoose populate
 const _mongooseModelRegistryGuard = [Order, Product, User, CartItem];
@@ -208,6 +209,7 @@ export async function updateOrderStatus(id: string, status: string, note?: strin
         revalidatePath('/admin/orders');
         revalidatePath(`/admin/orders/${id}`);
         revalidatePath('/admin');
+        await notifyStorefront(['orders', 'products']);
         return { error: null };
     } catch (err) {
         console.error('Error updating order status:', err);

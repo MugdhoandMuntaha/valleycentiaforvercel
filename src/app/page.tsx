@@ -2,8 +2,8 @@ import HeroCarousel from '@/components/HeroCarousel';
 import BrandScrollingRibbon from '@/components/BrandScrollingRibbon';
 import ProductCarouselSection from '@/components/ProductCarouselSection';
 import BrandsThatLead from '@/components/BrandsThatLead';
-import AdBannerGrid from '@/components/AdBannerGrid';
-import { getHeroSlides, getHomepageSections, getBrands } from '@/lib/db/queries';
+import AdBannerGrid, { type AdBanner } from '@/components/AdBannerGrid';
+import { getHeroSlides, getHomepageSections, getBrands, getSiteSetting } from '@/lib/db/queries';
 import type { SectionProductCard } from '@/lib/db/queries';
 import type { SectionProduct } from '@/data/homeSections';
 
@@ -49,11 +49,25 @@ export const revalidate = 60; // Regenerate homepage at most once every 60 secon
 
 export default async function HomePage() {
   // Fetch all data server-side in parallel
-  const [slides, sections, brands] = await Promise.all([
+  const [slides, sections, brands, adBannersVal] = await Promise.all([
     getHeroSlides(),
     getHomepageSections(),
     getBrands(),
+    getSiteSetting('ad_banners'),
   ]);
+
+  let customAds: AdBanner[] | undefined = undefined;
+  if (adBannersVal && typeof adBannersVal === 'object') {
+    const rawJson = (adBannersVal as Record<string, unknown>).banners_json;
+    if (typeof rawJson === 'string') {
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (Array.isArray(parsed) && parsed.length > 0) customAds = parsed;
+      } catch {}
+    } else if (Array.isArray(adBannersVal)) {
+      customAds = adBannersVal as AdBanner[];
+    }
+  }
 
   // Map hero slides
   const heroSlides = slides.map((s) => ({
@@ -101,7 +115,7 @@ export default async function HomePage() {
         if (section.section_type === 'brands_that_lead') {
           return (
             <div key={section.id}>
-              <AdBannerGrid />
+              <AdBannerGrid ads={customAds} />
               <BrandsThatLead
                 brands={brandCards}
                 background={section.background_color || '#f9f9f6'}

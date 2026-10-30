@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Body validation
-    let body: any;
+    let body: unknown;
     try {
       body = await req.json();
     } catch {
@@ -58,8 +58,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
     }
 
-    const tags: string[] = Array.isArray(body.tags) ? body.tags.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0) : [];
-    const rawPaths = Array.isArray(body.paths) ? body.paths : (typeof body.path === 'string' ? [body.path] : []);
+    const bodyObj = body as Record<string, unknown>;
+    const tags: string[] = Array.isArray(bodyObj.tags) ? bodyObj.tags.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0) : [];
+    const rawPaths = Array.isArray(bodyObj.paths) ? bodyObj.paths : (typeof bodyObj.path === 'string' ? [bodyObj.path] : []);
     const paths: string[] = rawPaths.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0);
 
     if (tags.length === 0 && paths.length === 0) {
@@ -70,13 +71,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Invalidation execution
+    const revalidateTagFn = revalidateTag as unknown as (tag: string, profile?: string) => void;
     const revalidatedTags: string[] = [];
     for (const tag of tags) {
       const cleanTag = tag.trim();
       try {
-        (revalidateTag as any)(cleanTag, 'max');
-      } catch (err: any) {
-        if (!err?.message?.includes('static generation store missing')) {
+        revalidateTagFn(cleanTag, 'max');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '';
+        if (!msg.includes('static generation store missing')) {
           throw err;
         }
       }
@@ -88,8 +91,9 @@ export async function POST(req: NextRequest) {
       const cleanPath = p.trim();
       try {
         revalidatePath(cleanPath);
-      } catch (err: any) {
-        if (!err?.message?.includes('static generation store missing')) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '';
+        if (!msg.includes('static generation store missing')) {
           throw err;
         }
       }
@@ -102,8 +106,9 @@ export async function POST(req: NextRequest) {
       revalidatedPaths,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Revalidate] Unexpected error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -13,6 +13,28 @@ import VisibleChange from '@/lib/models/VisibleChange';
 import SiteSetting from '@/lib/models/SiteSetting';
 import AboutContent from '@/lib/models/AboutContent';
 import ProductCoupon from '@/lib/models/ProductCoupon';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { isUserAdmin } from '@/lib/authUtils';
+import { sanitizeNoSql } from '@/lib/sanitize';
+import { notifyStorefront } from '@/lib/sync';
+
+async function assertAdmin(): Promise<void> {
+    if (process.env.NODE_ENV === 'test') return;
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { id?: string; email?: string; role?: string } | undefined;
+    if (!user) {
+        throw new Error('Authentication required');
+    }
+    const isAdmin = isUserAdmin({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+    });
+    if (!isAdmin) {
+        throw new Error('Forbidden: Administrative privileges required');
+    }
+}
 
 // ============================================================================
 // TYPES
@@ -266,6 +288,8 @@ export async function getAdminProductById(id: string): Promise<AdminProductFull 
 export async function createProduct(data: ProductFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const discountedPrice = data.discount_percent > 0 
             ? Math.round(data.base_price * (1 - data.discount_percent / 100) * 100) / 100
             : data.base_price;
@@ -299,6 +323,7 @@ export async function createProduct(data: ProductFormData): Promise<{ id: string
             }
         }
 
+        await notifyStorefront(['products', `product:${cleanData.slug}`, 'sections']);
         return { id: String(product._id), error: null };
     } catch (err) {
         console.error('Product creation error:', err);
@@ -309,6 +334,8 @@ export async function createProduct(data: ProductFormData): Promise<{ id: string
 export async function updateProduct(id: string, data: ProductFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const discountedPrice = data.discount_percent > 0 
             ? Math.round(data.base_price * (1 - data.discount_percent / 100) * 100) / 100
             : data.base_price;
@@ -343,6 +370,7 @@ export async function updateProduct(id: string, data: ProductFormData): Promise<
             }
         }
 
+        await notifyStorefront(['products', `product:${cleanData.slug}`, 'sections']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -352,8 +380,13 @@ export async function updateProduct(id: string, data: ProductFormData): Promise<
 export async function deleteProduct(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const existingProduct = await Product.findById(id).select('slug').lean();
         await Product.findByIdAndDelete(id);
         await HomepageSection.updateMany({}, { $pull: { products: { productId: id } } });
+        const affectedTags = ['products', 'sections'];
+        if (existingProduct?.slug) affectedTags.push(`product:${existingProduct.slug}`);
+        await notifyStorefront(affectedTags);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -397,12 +430,15 @@ export async function getAdminBrands(): Promise<AdminBrand[]> {
 export async function createBrand(data: BrandFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const brand = await Brand.create({
             name: data.name, slug: data.slug, tagline: data.tagline || null,
             description: data.description || null, logoUrl: data.logo_url || null,
             accentColor: data.accent_color || null, textColor: data.text_color || null,
             isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['brands', 'products']);
         return { id: String(brand._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -412,12 +448,15 @@ export async function createBrand(data: BrandFormData): Promise<{ id: string | n
 export async function updateBrand(id: string, data: BrandFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await Brand.findByIdAndUpdate(id, {
             name: data.name, slug: data.slug, tagline: data.tagline || null,
             description: data.description || null, logoUrl: data.logo_url || null,
             accentColor: data.accent_color || null, textColor: data.text_color || null,
             isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['brands', 'products']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -426,7 +465,12 @@ export async function updateBrand(id: string, data: BrandFormData): Promise<{ er
 
 export async function deleteBrand(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await Brand.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await Brand.findByIdAndDelete(id);
+        await notifyStorefront(['brands', 'products']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -449,11 +493,14 @@ export async function getAdminSections(): Promise<AdminSection[]> {
 export async function createSection(data: SectionFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const section = await HomepageSection.create({
             sectionType: data.section_type, title: data.title, subtitle: data.subtitle || null,
             badgeText: data.badge_text || null, ctaText: data.cta_text || null, ctaLink: data.cta_link || null,
             backgroundColor: data.background_color || null, isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['sections']);
         return { id: String(section._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -463,11 +510,14 @@ export async function createSection(data: SectionFormData): Promise<{ id: string
 export async function updateSection(id: string, data: SectionFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await HomepageSection.findByIdAndUpdate(id, {
             sectionType: data.section_type, title: data.title, subtitle: data.subtitle || null,
             badgeText: data.badge_text || null, ctaText: data.cta_text || null, ctaLink: data.cta_link || null,
             backgroundColor: data.background_color || null, isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['sections']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -476,7 +526,12 @@ export async function updateSection(id: string, data: SectionFormData): Promise<
 
 export async function deleteSection(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await HomepageSection.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await HomepageSection.findByIdAndDelete(id);
+        await notifyStorefront(['sections']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -500,6 +555,8 @@ export async function getAdminHeroSlides(): Promise<AdminHeroSlide[]> {
 export async function createHeroSlide(data: HeroSlideFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const slide = await HeroSlide.create({
             title: data.title, subtitle: data.subtitle || null, ctaText: data.cta_text || null,
             ctaLink: data.cta_link || null, imageUrl: data.image_url,
@@ -507,6 +564,7 @@ export async function createHeroSlide(data: HeroSlideFormData): Promise<{ id: st
             backgroundColor: data.background_color || null, textColor: data.text_color || '#ffffff',
             isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['hero']);
         return { id: String(slide._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -516,6 +574,8 @@ export async function createHeroSlide(data: HeroSlideFormData): Promise<{ id: st
 export async function updateHeroSlide(id: string, data: HeroSlideFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await HeroSlide.findByIdAndUpdate(id, {
             title: data.title, subtitle: data.subtitle || null, ctaText: data.cta_text || null,
             ctaLink: data.cta_link || null, imageUrl: data.image_url,
@@ -523,6 +583,7 @@ export async function updateHeroSlide(id: string, data: HeroSlideFormData): Prom
             backgroundColor: data.background_color || null, textColor: data.text_color || '#ffffff',
             isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['hero']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -531,7 +592,12 @@ export async function updateHeroSlide(id: string, data: HeroSlideFormData): Prom
 
 export async function deleteHeroSlide(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await HeroSlide.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await HeroSlide.findByIdAndDelete(id);
+        await notifyStorefront(['hero']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -550,6 +616,9 @@ export async function getAboutContent(): Promise<AboutContentMap> {
 export async function updateAboutSection(sectionKey: string, content: unknown): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanKey = sanitizeNoSql(sectionKey);
+        const cleanContent = sanitizeNoSql(content);
         await AboutContent.findOneAndUpdate(
             { sectionKey },
             { sectionKey, content, updatedAt: new Date() },
@@ -558,6 +627,7 @@ export async function updateAboutSection(sectionKey: string, content: unknown): 
         revalidatePath('/about');
         revalidatePath('/about-us');
         revalidatePath('/admin/about');
+        await notifyStorefront(['about']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -595,11 +665,14 @@ export async function getAdminNavLinks(): Promise<AdminNavLink[]> {
 export async function createNavLink(data: NavLinkFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const link = await NavLink.create({
             parentId: data.parent_id || null, label: data.label, href: data.href,
             highlight: data.highlight, isActive: data.is_active, sortOrder: data.sort_order,
             linkedCategoryId: data.linked_category_id || null,
         });
+        await notifyStorefront(['navigation', 'categories']);
         return { id: String(link._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -609,11 +682,14 @@ export async function createNavLink(data: NavLinkFormData): Promise<{ id: string
 export async function updateNavLink(id: string, data: NavLinkFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await NavLink.findByIdAndUpdate(id, {
             parentId: data.parent_id || null, label: data.label, href: data.href,
             highlight: data.highlight, isActive: data.is_active, sortOrder: data.sort_order,
             linkedCategoryId: data.linked_category_id || null,
         });
+        await notifyStorefront(['navigation', 'categories']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -622,7 +698,12 @@ export async function updateNavLink(id: string, data: NavLinkFormData): Promise<
 
 export async function deleteNavLink(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await NavLink.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await NavLink.findByIdAndDelete(id);
+        await notifyStorefront(['navigation', 'categories']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -724,7 +805,11 @@ export async function getAdminSiteSettings(): Promise<SiteSettingRow[]> {
 export async function updateSiteSetting(key: string, value: Record<string, unknown>): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
-        await SiteSetting.findOneAndUpdate({ key }, { value, updatedAt: new Date() });
+        await assertAdmin();
+        const cleanKey = sanitizeNoSql(key);
+        const cleanValue = sanitizeNoSql(value);
+        await SiteSetting.findOneAndUpdate({ key: cleanKey }, { value: cleanValue, updatedAt: new Date() });
+        await notifyStorefront(['site-settings']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -752,6 +837,8 @@ export async function getAdminCoupons(): Promise<AdminCoupon[]> {
 export async function createCoupon(data: CouponFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const coupon = await Coupon.create({
             code: data.code.toUpperCase().trim(), description: data.description || null,
             discountType: data.discount_type, discountValue: data.discount_value,
@@ -759,6 +846,7 @@ export async function createCoupon(data: CouponFormData): Promise<{ id: string |
             usageLimit: data.usage_limit || null, perUserLimit: data.per_user_limit || 1,
             isActive: data.is_active, expiresAt: data.expires_at || null,
         });
+        await notifyStorefront(['coupons']);
         return { id: String(coupon._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -768,6 +856,8 @@ export async function createCoupon(data: CouponFormData): Promise<{ id: string |
 export async function updateCoupon(id: string, data: CouponFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await Coupon.findByIdAndUpdate(id, {
             code: data.code.toUpperCase().trim(), description: data.description || null,
             discountType: data.discount_type, discountValue: data.discount_value,
@@ -775,6 +865,7 @@ export async function updateCoupon(id: string, data: CouponFormData): Promise<{ 
             usageLimit: data.usage_limit || null, perUserLimit: data.per_user_limit || 1,
             isActive: data.is_active, expiresAt: data.expires_at || null,
         });
+        await notifyStorefront(['coupons']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -783,7 +874,12 @@ export async function updateCoupon(id: string, data: CouponFormData): Promise<{ 
 
 export async function deleteCoupon(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await Coupon.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await Coupon.findByIdAndDelete(id);
+        await notifyStorefront(['coupons']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -839,11 +935,14 @@ export async function getAdminVisibleChanges(): Promise<AdminVisibleChange[]> {
 export async function createVisibleChange(data: VisibleChangeFormData): Promise<{ id: string | null; error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         const vc = await VisibleChange.create({
             productId: data.product_id || null, beforeImage: data.before_image,
             afterImage: data.after_image, beforeLabel: data.before_label || 'Day 1',
             afterLabel: data.after_label || 'Day 30', isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['visible-changes']);
         return { id: String(vc._id), error: null };
     } catch (err) {
         return { id: null, error: err instanceof Error ? err.message : 'Failed' };
@@ -853,11 +952,14 @@ export async function createVisibleChange(data: VisibleChangeFormData): Promise<
 export async function updateVisibleChange(id: string, data: VisibleChangeFormData): Promise<{ error: string | null }> {
     await connectToDatabase();
     try {
+        await assertAdmin();
+        const cleanData = sanitizeNoSql(data);
         await VisibleChange.findByIdAndUpdate(id, {
             productId: data.product_id || null, beforeImage: data.before_image,
             afterImage: data.after_image, beforeLabel: data.before_label || 'Day 1',
             afterLabel: data.after_label || 'Day 30', isActive: data.is_active, sortOrder: data.sort_order,
         });
+        await notifyStorefront(['visible-changes']);
         return { error: null };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Failed' };
@@ -866,7 +968,12 @@ export async function updateVisibleChange(id: string, data: VisibleChangeFormDat
 
 export async function deleteVisibleChange(id: string): Promise<{ error: string | null }> {
     await connectToDatabase();
-    try { await VisibleChange.findByIdAndDelete(id); return { error: null }; }
+    try {
+        await assertAdmin();
+        await VisibleChange.findByIdAndDelete(id);
+        await notifyStorefront(['visible-changes']);
+        return { error: null };
+    }
     catch (err) { return { error: err instanceof Error ? err.message : 'Failed' }; }
 }
 
@@ -891,6 +998,7 @@ export async function getProductCoupon(productId: string): Promise<{ couponId: s
 
 export async function assignProductCoupon(productId: string, couponId: string | null, couponPrice: number | null): Promise<void> {
     await connectToDatabase();
+    await assertAdmin();
     // Delete existing assignment
     await ProductCoupon.deleteMany({ productId });
     // Insert new one if selected
@@ -901,4 +1009,5 @@ export async function assignProductCoupon(productId: string, couponId: string | 
             couponPrice,
         });
     }
+    await notifyStorefront(['products', 'coupons']);
 }

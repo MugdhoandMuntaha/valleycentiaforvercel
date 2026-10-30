@@ -6,6 +6,7 @@ import HomepageSection from '@/lib/models/HomepageSection';
 import Brand from '@/lib/models/Brand';
 import Product from '@/lib/models/Product';
 import VisibleChange from '@/lib/models/VisibleChange';
+import { safeCache } from '@/lib/cache';
 import { toProductCard, resolveCouponMap, calculateProductPricing } from './helpers';
 import type { HeroSlideData, BrandData, HomepageSectionData, SectionProductCard, VisibleChangeItem } from './types';
 
@@ -13,7 +14,7 @@ import type { HeroSlideData, BrandData, HomepageSectionData, SectionProductCard,
 // HERO SLIDES
 // ============================================================================
 
-export async function getHeroSlides(): Promise<HeroSlideData[]> {
+const fetchHeroSlides = async (): Promise<HeroSlideData[]> => {
     await connectToDatabase();
     const slides = await HeroSlide.find({ isActive: true }).sort('sortOrder').lean();
 
@@ -29,13 +30,23 @@ export async function getHeroSlides(): Promise<HeroSlideData[]> {
         background_color: s.backgroundColor,
         text_color: s.textColor,
     }));
+};
+
+const cachedHeroSlides = safeCache(
+    fetchHeroSlides,
+    ['hero-slides-active'],
+    { tags: ['hero'], revalidate: 3600 }
+);
+
+export async function getHeroSlides(): Promise<HeroSlideData[]> {
+    return cachedHeroSlides();
 }
 
 // ============================================================================
 // BRANDS
 // ============================================================================
 
-export async function getBrands(): Promise<BrandData[]> {
+const fetchBrands = async (): Promise<BrandData[]> => {
     await connectToDatabase();
     const brands = await Brand.find({ isActive: true }).sort('sortOrder').lean();
 
@@ -49,13 +60,23 @@ export async function getBrands(): Promise<BrandData[]> {
         accent_color: b.accentColor,
         text_color: b.textColor || null,
     }));
+};
+
+const cachedBrands = safeCache(
+    fetchBrands,
+    ['brands-active'],
+    { tags: ['brands'], revalidate: 3600 }
+);
+
+export async function getBrands(): Promise<BrandData[]> {
+    return cachedBrands();
 }
 
 // ============================================================================
 // HOMEPAGE SECTIONS
 // ============================================================================
 
-export async function getHomepageSections(): Promise<HomepageSectionData[]> {
+const fetchHomepageSections = async (): Promise<HomepageSectionData[]> => {
     await connectToDatabase();
 
     const sections = await HomepageSection.find({ isActive: true }).sort('sortOrder').lean();
@@ -84,7 +105,7 @@ export async function getHomepageSections(): Promise<HomepageSectionData[]> {
 
         const productIds = section.products.map((sp: Record<string, unknown>) => sp.productId);
 
-        const products = await Product.find({ _id: { $in: productIds }, isActive: true })
+        const products = await Product.find({ _id: { $in: productIds }, isActive: true, isDeleted: { $ne: true } })
             .populate('brandId', 'name slug')
             .populate('categoryId', 'name slug')
             .lean();
@@ -114,22 +135,32 @@ export async function getHomepageSections(): Promise<HomepageSectionData[]> {
     }
 
     return result;
+};
+
+const cachedHomepageSections = safeCache(
+    fetchHomepageSections,
+    ['homepage-sections-active'],
+    { tags: ['sections'], revalidate: 3600 }
+);
+
+export async function getHomepageSections(): Promise<HomepageSectionData[]> {
+    return cachedHomepageSections();
 }
 
 // ============================================================================
 // VISIBLE CHANGES (uses shared calculateProductPricing — OCP fix)
 // ============================================================================
 
-export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
+const fetchVisibleChanges = async (): Promise<VisibleChangeItem[]> => {
     await connectToDatabase();
 
     const changes = await VisibleChange.find({ isActive: true })
-        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images sizes')
+        .populate('productId', 'name slug basePrice compareAtPrice discountPercent ratingAvg reviewCount images sizes isDeleted')
         .sort('sortOrder')
         .lean();
 
     return changes
-        .filter(vc => vc.productId)
+        .filter(vc => vc.productId && !(vc.productId as unknown as Record<string, unknown>).isDeleted)
         .map(vc => {
             const product = vc.productId as unknown as Record<string, unknown>;
             const images = (product.images as Array<Record<string, unknown>>) || [];
@@ -156,4 +187,14 @@ export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
                 discountPercent: Number(discountPercent) || 0,
             };
         });
+};
+
+const cachedVisibleChanges = safeCache(
+    fetchVisibleChanges,
+    ['visible-changes-active'],
+    { tags: ['visible-changes'], revalidate: 3600 }
+);
+
+export async function getVisibleChanges(): Promise<VisibleChangeItem[]> {
+    return cachedVisibleChanges();
 }

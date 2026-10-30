@@ -29,6 +29,14 @@ const SETTING_META: Record<string, { label: string; icon: React.ComponentType<{ 
             { key: 'announcement_text', label: 'Announcement Text', type: 'text' },
         ],
     },
+    maintenance_mode: {
+        label: 'Maintenance Mode',
+        icon: Shield,
+        fields: [
+            { key: 'enabled', label: 'Enable Maintenance Mode (Restricts Storefront)', type: 'boolean' },
+            { key: 'message', label: 'Maintenance Notice Message', type: 'text' },
+        ],
+    },
     free_shipping_threshold: {
         label: 'Free Shipping Threshold',
         icon: Truck,

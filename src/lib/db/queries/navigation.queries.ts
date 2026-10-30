@@ -3,9 +3,10 @@
 import connectToDatabase from '@/lib/mongodb';
 import NavLinkModel from '@/lib/models/NavLink';
 import Category from '@/lib/models/Category';
+import { safeCache } from '@/lib/cache';
 import type { NavLinkItem } from './types';
 
-export async function getNavLinks(): Promise<NavLinkItem[]> {
+const fetchNavLinks = async (): Promise<NavLinkItem[]> => {
     await connectToDatabase();
 
     const all = await NavLinkModel.find({ isActive: true }).sort('sortOrder').lean();
@@ -16,7 +17,7 @@ export async function getNavLinks(): Promise<NavLinkItem[]> {
     // Get linked category children
     const linkedCategoryIds = topLevel.map(n => n.linkedCategoryId).filter(Boolean);
 
-    let categoryChildrenMap: Record<string, { name: string; slug: string }[]> = {};
+    const categoryChildrenMap: Record<string, { name: string; slug: string }[]> = {};
     if (linkedCategoryIds.length > 0) {
         const catChildren = await Category.find({
             parentId: { $in: linkedCategoryIds },
@@ -55,4 +56,14 @@ export async function getNavLinks(): Promise<NavLinkItem[]> {
             children,
         };
     });
+};
+
+const cachedNavLinks = safeCache(
+    fetchNavLinks,
+    ['nav-links-active'],
+    { tags: ['navigation', 'categories'], revalidate: 3600 }
+);
+
+export async function getNavLinks(): Promise<NavLinkItem[]> {
+    return cachedNavLinks();
 }

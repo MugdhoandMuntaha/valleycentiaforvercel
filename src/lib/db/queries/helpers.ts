@@ -131,6 +131,16 @@ export async function recalculateProductRating(productId: string): Promise<void>
     const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;
 
     await Product.findByIdAndUpdate(productId, { reviewCount, ratingAvg });
+
+    try {
+        const { revalidateTag } = await import('next/cache');
+        const revalidateTagFn = revalidateTag as unknown as (tag: string, profile?: string) => void;
+        const prod = await Product.findById(productId).select('slug').lean();
+        revalidateTagFn('products', 'max');
+        if (prod?.slug) {
+            revalidateTagFn(`product:${prod.slug}`, 'max');
+        }
+    } catch {}
 }
 
 /**
