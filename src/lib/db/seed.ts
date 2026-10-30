@@ -1,6 +1,4 @@
 import { loadEnvConfig } from '@next/env';
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 // Load environment variables from .env.local
 const projectDir = process.cwd();

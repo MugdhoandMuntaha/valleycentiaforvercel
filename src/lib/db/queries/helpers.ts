@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import connectToDatabase from '@/lib/mongodb';
 import Product from '@/lib/models/Product';
 import ProductCoupon from '@/lib/models/ProductCoupon';
 import type { ProductCard } from './types';
@@ -121,7 +120,12 @@ export function mapProductsToCards(products: Record<string, unknown>[]): Product
  */
 export async function recalculateProductRating(productId: string): Promise<void> {
     const Review = (await import('@/lib/models/Review')).default;
-    const approvedReviews = await Review.find({ productId, isApproved: true }).lean();
+    const approvedReviews = await Review.find({
+        productId,
+        isApproved: true,
+        isDeleted: { $ne: true },
+        status: { $ne: 'deleted' },
+    }).lean();
     const reviewCount = approvedReviews.length;
     const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
     const ratingAvg = reviewCount > 0 ? Math.round((totalRating / reviewCount) * 10) / 10 : 0;

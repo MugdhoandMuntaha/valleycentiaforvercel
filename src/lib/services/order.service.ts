@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import connectToDatabase from '@/lib/mongodb';
-import Order, { IOrder } from '@/lib/models/Order';
+import Order from '@/lib/models/Order';
 import CartItem from '@/lib/models/CartItem';
 import { updateStockForOrder, restoreStockForOrder } from '@/lib/db/queries';
 import { validateAndCalculateOrder, IncomingOrderItem, VerifiedOrderCalculation } from '@/lib/orderValidation';
