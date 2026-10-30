@@ -484,6 +484,34 @@ a {
   }
 }
 
+/* ===== PDP Mobile Sticky Action Bar ===== */
+.pdp-sticky-bar button:focus-visible {
+  outline: 2px solid #1a1a1a !important;
+  outline-offset: 2px !important;
+}
+
+.pdp-sticky-btn-cart:active,
+.pdp-sticky-btn-buy:active,
+.pdp-sticky-btn-wishlist:active {
+  transform: scale(0.98);
+}
+
+@media (min-width: 768px) {
+  .pdp-sticky-bar {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .pdp-page-container {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  body:has(.pdp-page-container) footer {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 /* ===== Review Section Responsive ===== */
 @media (max-width: 768px) {
   .review-grid {
@@ -1819,5 +1847,332 @@ a {
     font-size: 8.5px !important;
     letter-spacing: 0 !important;
     border-radius: 5px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   PRODUCT DETAILS PAGE — Enhanced Mobile Review System
+   ═══════════════════════════════════════════════════════ */
+.pdp-reviews-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pdp-reviews-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 48px 64px;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+.review-star-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.review-star-bar:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.review-star-bar.is-active {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+}
+
+.review-card {
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  position: relative;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.review-card:hover {
+  border-color: #e5e5e5;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+/* Mobile viewport adjustments (<= 900px) */
+@media (max-width: 900px) {
+  .pdp-reviews-container {
+    padding: 0 24px 48px !important;
+  }
+  .review-grid {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+}
+
+/* Mobile viewport adjustments (<= 640px) */
+@media (max-width: 640px) {
+  .pdp-reviews-container {
+    padding: 0 16px 40px !important;
+  }
+  .pdp-reviews-section h2 {
+    font-size: 20px !important;
+    margin-bottom: 16px !important;
+  }
+  .review-card {
+    padding: 16px !important;
+    border-radius: 14px !important;
+  }
+  .review-rating-summary {
+    padding: 20px 16px !important;
+    border-radius: 16px !important;
+  }
+  .review-filter-chips {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .review-filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   Desktop vs Mobile Review Section Switching & Mobile Wireframe Styles
+   ─────────────────────────────────────────────────────────── */
+.desktop-reviews-view {
+  display: block;
+}
+
+.mobile-reviews-view {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .desktop-reviews-view {
+    display: none !important;
+  }
+  .mobile-reviews-view {
+    display: flex !important;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+.mobile-reviews-carousel {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0 12px;
+  scrollbar-width: none;
+  width: 100%;
+}
+
+.mobile-reviews-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-review-card-item {
+  flex: 0 0 calc(75% - 6px);
+  width: calc(75% - 6px);
+  min-width: calc(75% - 6px);
+  max-width: none;
+  scroll-snap-align: start;
+  border: 1px solid #e0e0e0;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  color: #1a1a1a;
+  word-break: break-word;
+}
+
+/* ───────────────────────────────────────────────────────────
+   Review Box Input & Textarea Visibility Fix
+   ─────────────────────────────────────────────────────────── */
+.mobile-reviews-view,
+.desktop-reviews-view,
+.pdp-reviews-section {
+  color: #1a1a1a;
+}
+
+.mobile-reviews-view input,
+.mobile-reviews-view textarea,
+.desktop-reviews-view input,
+.desktop-reviews-view textarea,
+.pdp-reviews-section input,
+.pdp-reviews-section textarea {
+  color: #1a1a1a !important;
+  -webkit-text-fill-color: #1a1a1a !important;
+  background-color: #ffffff !important;
+}
+
+.mobile-reviews-view input::placeholder,
+.mobile-reviews-view textarea::placeholder,
+.desktop-reviews-view input::placeholder,
+.desktop-reviews-view textarea::placeholder,
+.pdp-reviews-section input::placeholder,
+.pdp-reviews-section textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #6b7280 !important;
+}
+
+
+
+/* ───────────────────────────────────────────────────────────
+   Fixed-Height Vertically Scrollable Reviews Area & Pinned Header
+   ─────────────────────────────────────────────────────────── */
+.reviews-scroll-area {
+  position: relative;
+  height: 600px;
+  max-height: 600px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+  border-radius: 18px;
+  border: 1px solid #e8e8e8;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.reviews-scroll-area:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.reviews-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.reviews-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reviews-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 9999px;
+}
+
+.reviews-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.reviews-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #ffffff;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.04);
+}
+
+.reviews-scroll-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .reviews-scroll-area {
+    height: 70vh;
+    max-height: 70vh;
+    border-radius: 14px;
+  }
+  .reviews-sticky-header {
+    padding: 12px 14px 10px;
+  }
+  .reviews-scroll-content {
+    padding: 14px 12px;
+    gap: 12px;
+  }
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   Brands That Lead — Mobile Redesign (< 768px)
+   ─────────────────────────────────────────────────────────── */
+.brands-desktop-view {
+  display: block;
+}
+
+.brands-mobile-view {
+  display: none !important;
+}
+
+.brands-mobile-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .brands-desktop-view {
+    display: none !important;
+  }
+
+  .brands-mobile-view {
+    --brand-gap: 8px;
+    --brand-cell-height: calc((100vw - 56px) / 4);
+    --brand-cell-width: calc((100vw - 48px) / 2.5);
+    display: block !important;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .brands-that-lead-section {
+    padding: 14px 0 16px !important;
+  }
+
+  .brands-that-lead-section .section-header-row {
+    padding: 0 16px !important;
+    margin-bottom: 12px !important;
+    justify-content: flex-start !important;
+  }
+
+  .brands-that-lead-section .section-title-wrap h2 {
+    font-size: 16px !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .brands-mobile-viewport {
+    padding: 0 16px !important;
+    box-sizing: border-box;
+  }
+
+  .brands-mobile-group {
+    display: grid !important;
+    grid-template-rows: repeat(2, var(--brand-cell-height, 76px)) !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: var(--brand-cell-width, 124px) !important;
+    gap: var(--brand-gap, 8px) !important;
+    padding-right: var(--brand-gap, 8px) !important;
+    flex-shrink: 0 !important;
+  }
+
+  .brand-mobile-card {
+    width: var(--brand-cell-width, 124px) !important;
+    min-width: var(--brand-cell-width, 124px) !important;
+    height: var(--brand-cell-height, 76px) !important;
   }
 }

@@ -124,6 +124,7 @@ export interface ReviewData {
     helpful_count: number;
     created_at: string;
     user_name?: string;
+    location?: string | null;
     images?: { url: string; altText: string | null; sortOrder: number }[];
 }
 

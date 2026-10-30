@@ -73,6 +73,7 @@ export default async function HomePage() {
       slug: b.slug,
       tagline: b.tagline || '',
       image: b.logo_url || '/no-image.svg',
+      logo_url: b.logo_url || null,
       background: `linear-gradient(135deg, ${accent}cc 0%, ${accent} 50%, ${accent}dd 100%)`,
       textColor: b.text_color || undefined,
     };

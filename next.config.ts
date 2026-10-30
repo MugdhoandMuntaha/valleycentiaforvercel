@@ -137,8 +137,20 @@ const nextConfig: NextConfig = {
     ];
   },
   async redirects() {
+    const redirectsList = [
+      {
+        source: '/signin',
+        destination: '/auth/sign-in',
+        permanent: false,
+      },
+      {
+        source: '/signup',
+        destination: '/auth/sign-up',
+        permanent: false,
+      },
+    ];
     if (process.env.NODE_ENV === 'development') {
-      return [
+      redirectsList.push(
         {
           source: '/admin/:path*',
           destination: 'http://localhost:3001/admin/:path*',
@@ -149,9 +161,9 @@ const nextConfig: NextConfig = {
           destination: 'http://localhost:3001/admin',
           permanent: false,
         },
-      ];
+      );
     }
-    return [];
+    return redirectsList;
   },
   async rewrites() {
     return [

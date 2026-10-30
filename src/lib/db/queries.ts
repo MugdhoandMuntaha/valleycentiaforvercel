@@ -143,6 +143,7 @@ export interface ReviewData {
     helpful_count: number;
     created_at: string;
     user_name?: string;
+    location?: string | null;
     images?: { url: string; altText: string | null; sortOrder: number }[];
 }
 
@@ -353,6 +354,12 @@ export async function updateReview(
     data: Parameters<typeof rev.updateReview>[0]
 ): ReturnType<typeof rev.updateReview> {
     return rev.updateReview(data);
+}
+
+export async function voteHelpfulReview(
+    data: Parameters<typeof rev.voteHelpfulReview>[0]
+): ReturnType<typeof rev.voteHelpfulReview> {
+    return rev.voteHelpfulReview(data);
 }
 
 // Addresses
