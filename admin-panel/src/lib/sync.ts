@@ -64,8 +64,9 @@ export async function notifyStorefront(
       revalidatedTags: data.revalidatedTags,
       revalidatedPaths: data.revalidatedPaths,
     };
-  } catch (err: any) {
-    const msg = `[Sync] Could not reach storefront at ${storefrontUrl}: ${err.name === 'AbortError' ? 'Request timed out' : err.message}`;
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
+    const msg = `[Sync] Could not reach storefront at ${storefrontUrl}: ${error.name === 'AbortError' ? 'Request timed out' : (error.message || String(err))}`;
     console.warn(msg);
     return { success: false, error: msg };
   }

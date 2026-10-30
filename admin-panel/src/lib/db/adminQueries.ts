@@ -433,10 +433,10 @@ export async function createBrand(data: BrandFormData): Promise<{ id: string | n
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const brand = await Brand.create({
-            name: data.name, slug: data.slug, tagline: data.tagline || null,
-            description: data.description || null, logoUrl: data.logo_url || null,
-            accentColor: data.accent_color || null, textColor: data.text_color || null,
-            isActive: data.is_active, sortOrder: data.sort_order,
+            name: cleanData.name, slug: cleanData.slug, tagline: cleanData.tagline || null,
+            description: cleanData.description || null, logoUrl: cleanData.logo_url || null,
+            accentColor: cleanData.accent_color || null, textColor: cleanData.text_color || null,
+            isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['brands', 'products']);
         return { id: String(brand._id), error: null };
@@ -451,10 +451,10 @@ export async function updateBrand(id: string, data: BrandFormData): Promise<{ er
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await Brand.findByIdAndUpdate(id, {
-            name: data.name, slug: data.slug, tagline: data.tagline || null,
-            description: data.description || null, logoUrl: data.logo_url || null,
-            accentColor: data.accent_color || null, textColor: data.text_color || null,
-            isActive: data.is_active, sortOrder: data.sort_order,
+            name: cleanData.name, slug: cleanData.slug, tagline: cleanData.tagline || null,
+            description: cleanData.description || null, logoUrl: cleanData.logo_url || null,
+            accentColor: cleanData.accent_color || null, textColor: cleanData.text_color || null,
+            isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['brands', 'products']);
         return { error: null };
@@ -496,9 +496,9 @@ export async function createSection(data: SectionFormData): Promise<{ id: string
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const section = await HomepageSection.create({
-            sectionType: data.section_type, title: data.title, subtitle: data.subtitle || null,
-            badgeText: data.badge_text || null, ctaText: data.cta_text || null, ctaLink: data.cta_link || null,
-            backgroundColor: data.background_color || null, isActive: data.is_active, sortOrder: data.sort_order,
+            sectionType: cleanData.section_type, title: cleanData.title, subtitle: cleanData.subtitle || null,
+            badgeText: cleanData.badge_text || null, ctaText: cleanData.cta_text || null, ctaLink: cleanData.cta_link || null,
+            backgroundColor: cleanData.background_color || null, isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['sections']);
         return { id: String(section._id), error: null };
@@ -513,9 +513,9 @@ export async function updateSection(id: string, data: SectionFormData): Promise<
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await HomepageSection.findByIdAndUpdate(id, {
-            sectionType: data.section_type, title: data.title, subtitle: data.subtitle || null,
-            badgeText: data.badge_text || null, ctaText: data.cta_text || null, ctaLink: data.cta_link || null,
-            backgroundColor: data.background_color || null, isActive: data.is_active, sortOrder: data.sort_order,
+            sectionType: cleanData.section_type, title: cleanData.title, subtitle: cleanData.subtitle || null,
+            badgeText: cleanData.badge_text || null, ctaText: cleanData.cta_text || null, ctaLink: cleanData.cta_link || null,
+            backgroundColor: cleanData.background_color || null, isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['sections']);
         return { error: null };
@@ -558,11 +558,11 @@ export async function createHeroSlide(data: HeroSlideFormData): Promise<{ id: st
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const slide = await HeroSlide.create({
-            title: data.title, subtitle: data.subtitle || null, ctaText: data.cta_text || null,
-            ctaLink: data.cta_link || null, imageUrl: data.image_url,
-            mobileImageUrl: data.mobile_image_url || null, imageAlt: data.image_alt || null,
-            backgroundColor: data.background_color || null, textColor: data.text_color || '#ffffff',
-            isActive: data.is_active, sortOrder: data.sort_order,
+            title: cleanData.title, subtitle: cleanData.subtitle || null, ctaText: cleanData.cta_text || null,
+            ctaLink: cleanData.cta_link || null, imageUrl: cleanData.image_url,
+            mobileImageUrl: cleanData.mobile_image_url || null, imageAlt: cleanData.image_alt || null,
+            backgroundColor: cleanData.background_color || null, textColor: cleanData.text_color || '#ffffff',
+            isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['hero']);
         return { id: String(slide._id), error: null };
@@ -577,11 +577,11 @@ export async function updateHeroSlide(id: string, data: HeroSlideFormData): Prom
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await HeroSlide.findByIdAndUpdate(id, {
-            title: data.title, subtitle: data.subtitle || null, ctaText: data.cta_text || null,
-            ctaLink: data.cta_link || null, imageUrl: data.image_url,
-            mobileImageUrl: data.mobile_image_url || null, imageAlt: data.image_alt || null,
-            backgroundColor: data.background_color || null, textColor: data.text_color || '#ffffff',
-            isActive: data.is_active, sortOrder: data.sort_order,
+            title: cleanData.title, subtitle: cleanData.subtitle || null, ctaText: cleanData.cta_text || null,
+            ctaLink: cleanData.cta_link || null, imageUrl: cleanData.image_url,
+            mobileImageUrl: cleanData.mobile_image_url || null, imageAlt: cleanData.image_alt || null,
+            backgroundColor: cleanData.background_color || null, textColor: cleanData.text_color || '#ffffff',
+            isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['hero']);
         return { error: null };
@@ -620,8 +620,8 @@ export async function updateAboutSection(sectionKey: string, content: unknown): 
         const cleanKey = sanitizeNoSql(sectionKey);
         const cleanContent = sanitizeNoSql(content);
         await AboutContent.findOneAndUpdate(
-            { sectionKey },
-            { sectionKey, content, updatedAt: new Date() },
+            { sectionKey: cleanKey },
+            { sectionKey: cleanKey, content: cleanContent, updatedAt: new Date() },
             { upsert: true }
         );
         revalidatePath('/about');
@@ -668,9 +668,9 @@ export async function createNavLink(data: NavLinkFormData): Promise<{ id: string
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const link = await NavLink.create({
-            parentId: data.parent_id || null, label: data.label, href: data.href,
-            highlight: data.highlight, isActive: data.is_active, sortOrder: data.sort_order,
-            linkedCategoryId: data.linked_category_id || null,
+            parentId: cleanData.parent_id || null, label: cleanData.label, href: cleanData.href,
+            highlight: cleanData.highlight, isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
+            linkedCategoryId: cleanData.linked_category_id || null,
         });
         await notifyStorefront(['navigation', 'categories']);
         return { id: String(link._id), error: null };
@@ -685,9 +685,9 @@ export async function updateNavLink(id: string, data: NavLinkFormData): Promise<
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await NavLink.findByIdAndUpdate(id, {
-            parentId: data.parent_id || null, label: data.label, href: data.href,
-            highlight: data.highlight, isActive: data.is_active, sortOrder: data.sort_order,
-            linkedCategoryId: data.linked_category_id || null,
+            parentId: cleanData.parent_id || null, label: cleanData.label, href: cleanData.href,
+            highlight: cleanData.highlight, isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
+            linkedCategoryId: cleanData.linked_category_id || null,
         });
         await notifyStorefront(['navigation', 'categories']);
         return { error: null };
@@ -840,11 +840,11 @@ export async function createCoupon(data: CouponFormData): Promise<{ id: string |
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const coupon = await Coupon.create({
-            code: data.code.toUpperCase().trim(), description: data.description || null,
-            discountType: data.discount_type, discountValue: data.discount_value,
-            minimumOrderValue: data.minimum_order_value || 0, maxDiscountAmount: data.max_discount_amount || null,
-            usageLimit: data.usage_limit || null, perUserLimit: data.per_user_limit || 1,
-            isActive: data.is_active, expiresAt: data.expires_at || null,
+            code: cleanData.code.toUpperCase().trim(), description: cleanData.description || null,
+            discountType: cleanData.discount_type, discountValue: cleanData.discount_value,
+            minimumOrderValue: cleanData.minimum_order_value || 0, maxDiscountAmount: cleanData.max_discount_amount || null,
+            usageLimit: cleanData.usage_limit || null, perUserLimit: cleanData.per_user_limit || 1,
+            isActive: cleanData.is_active, expiresAt: cleanData.expires_at || null,
         });
         await notifyStorefront(['coupons']);
         return { id: String(coupon._id), error: null };
@@ -859,11 +859,11 @@ export async function updateCoupon(id: string, data: CouponFormData): Promise<{ 
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await Coupon.findByIdAndUpdate(id, {
-            code: data.code.toUpperCase().trim(), description: data.description || null,
-            discountType: data.discount_type, discountValue: data.discount_value,
-            minimumOrderValue: data.minimum_order_value || 0, maxDiscountAmount: data.max_discount_amount || null,
-            usageLimit: data.usage_limit || null, perUserLimit: data.per_user_limit || 1,
-            isActive: data.is_active, expiresAt: data.expires_at || null,
+            code: cleanData.code.toUpperCase().trim(), description: cleanData.description || null,
+            discountType: cleanData.discount_type, discountValue: cleanData.discount_value,
+            minimumOrderValue: cleanData.minimum_order_value || 0, maxDiscountAmount: cleanData.max_discount_amount || null,
+            usageLimit: cleanData.usage_limit || null, perUserLimit: cleanData.per_user_limit || 1,
+            isActive: cleanData.is_active, expiresAt: cleanData.expires_at || null,
         });
         await notifyStorefront(['coupons']);
         return { error: null };
@@ -897,7 +897,7 @@ export async function getAdminVisibleChanges(): Promise<AdminVisibleChange[]> {
         const product = vc.productId as unknown as Record<string, unknown> | null;
         const images = product ? (product.images as Array<Record<string, unknown>>) || [] : [];
         const primaryImage = images.find(i => i.isPrimary) || images[0];
-        const sizes = product ? (product.sizes as Array<Record<string, any>>) || [] : [];
+        const sizes = product ? (product.sizes as Array<Record<string, unknown>>) || [] : [];
         const activeSizes = sizes.filter(s => s && s.isActive !== false);
         const defaultSize = activeSizes.find(s => s.isDefault) || activeSizes[0];
 
@@ -938,9 +938,9 @@ export async function createVisibleChange(data: VisibleChangeFormData): Promise<
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         const vc = await VisibleChange.create({
-            productId: data.product_id || null, beforeImage: data.before_image,
-            afterImage: data.after_image, beforeLabel: data.before_label || 'Day 1',
-            afterLabel: data.after_label || 'Day 30', isActive: data.is_active, sortOrder: data.sort_order,
+            productId: cleanData.product_id || null, beforeImage: cleanData.before_image,
+            afterImage: cleanData.after_image, beforeLabel: cleanData.before_label || 'Day 1',
+            afterLabel: cleanData.after_label || 'Day 30', isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['visible-changes']);
         return { id: String(vc._id), error: null };
@@ -955,9 +955,9 @@ export async function updateVisibleChange(id: string, data: VisibleChangeFormDat
         await assertAdmin();
         const cleanData = sanitizeNoSql(data);
         await VisibleChange.findByIdAndUpdate(id, {
-            productId: data.product_id || null, beforeImage: data.before_image,
-            afterImage: data.after_image, beforeLabel: data.before_label || 'Day 1',
-            afterLabel: data.after_label || 'Day 30', isActive: data.is_active, sortOrder: data.sort_order,
+            productId: cleanData.product_id || null, beforeImage: cleanData.before_image,
+            afterImage: cleanData.after_image, beforeLabel: cleanData.before_label || 'Day 1',
+            afterLabel: cleanData.after_label || 'Day 30', isActive: cleanData.is_active, sortOrder: cleanData.sort_order,
         });
         await notifyStorefront(['visible-changes']);
         return { error: null };
