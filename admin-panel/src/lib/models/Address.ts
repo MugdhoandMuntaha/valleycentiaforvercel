@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IAddress extends Document {
     _id: mongoose.Types.ObjectId;
-    userId: mongoose.Types.ObjectId;
+    userId: string;
     label: string;
     fullName: string;
     phone: string;
@@ -20,7 +20,7 @@ export interface IAddress extends Document {
 
 const AddressSchema = new Schema<IAddress>(
     {
-        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        userId: { type: String, required: true },
         label: { type: String, default: 'Home' },
         fullName: { type: String, required: true },
         phone: { type: String, required: true },

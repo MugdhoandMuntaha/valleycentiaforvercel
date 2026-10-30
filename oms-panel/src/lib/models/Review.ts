@@ -35,11 +35,13 @@ export interface IReview extends Document {
     isApproved: boolean;
     helpfulCount: number;
     images: IReviewImage[];
+    // Soft delete & audit trail
     status: 'active' | 'deleted' | 'hidden' | 'reported';
     isDeleted: boolean;
     deletedAt: Date | null;
     deletedBy: string | null;
     deletionReason: string | null;
+    // Moderation queue & user reports
     reports: IReviewReport[];
     reportCount: number;
     isReported: boolean;

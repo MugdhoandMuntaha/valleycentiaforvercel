@@ -2,14 +2,14 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IAddress extends Document {
     _id: mongoose.Types.ObjectId;
-    userId: mongoose.Types.ObjectId;
+    userId: string;
     label: string;
     fullName: string;
     phone: string;
     addressLine1: string;
     addressLine2: string | null;
     city: string;
-    state: string;
+    state: string | null;
     postalCode: string | null;
     country: string;
     landmark: string | null;
@@ -20,14 +20,14 @@ export interface IAddress extends Document {
 
 const AddressSchema = new Schema<IAddress>(
     {
-        userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+        userId: { type: String, required: true },
         label: { type: String, default: 'Home' },
         fullName: { type: String, required: true },
         phone: { type: String, required: true },
         addressLine1: { type: String, required: true },
         addressLine2: { type: String, default: null },
         city: { type: String, required: true },
-        state: { type: String, required: true },
+        state: { type: String, default: null },
         postalCode: { type: String, default: null },
         country: { type: String, default: 'Bangladesh' },
         landmark: { type: String, default: null },

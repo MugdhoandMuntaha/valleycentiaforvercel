@@ -16,9 +16,9 @@ const ProductSizeSchema = new Schema(
     {
         label: { type: String, required: true },
         mlValue: { type: String, default: null },
-        price: { type: Number, required: true },
+        price: { type: Number, required: true, min: 0 },
         skuSuffix: { type: String, default: null },
-        stockQuantity: { type: Number, default: 0 },
+        stockQuantity: { type: Number, default: 0, min: 0 },
         isDefault: { type: Boolean, default: false },
         isActive: { type: Boolean, default: true },
         sortOrder: { type: Number, default: 0 },
@@ -138,6 +138,8 @@ export interface IProduct extends Document {
     keyBenefits: IKeyBenefit[];
     highlights: IHighlight[];
     badges: IProductBadge[];
+    isDeleted?: boolean;
+    deletedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -156,14 +158,14 @@ const ProductSchema = new Schema<IProduct>(
         basePrice: { type: Number, required: true, min: 0 },
         compareAtPrice: { type: Number, default: null },
         discountPercent: { type: Number, default: 0 },
-        costPrice: { type: Number, default: null },
+        costPrice: { type: Number, default: null, min: 0 },
         sku: { type: String, default: null, sparse: true },
         barcode: { type: String, default: null },
         weightGrams: { type: Number, default: null },
         isActive: { type: Boolean, default: true },
         isFeatured: { type: Boolean, default: false },
         inStock: { type: Boolean, default: true },
-        stockQuantity: { type: Number, default: 0 },
+        stockQuantity: { type: Number, default: 0, min: 0 },
         lowStockThreshold: { type: Number, default: 5 },
         ratingAvg: { type: Number, default: 0 },
         reviewCount: { type: Number, default: 0 },
@@ -176,6 +178,8 @@ const ProductSchema = new Schema<IProduct>(
         keyBenefits: [KeyBenefitSchema],
         highlights: [HighlightSchema],
         badges: [ProductBadgeSchema],
+        isDeleted: { type: Boolean, default: false, index: true },
+        deletedAt: { type: Date, default: null },
     },
     { timestamps: true }
 );
@@ -188,6 +192,8 @@ ProductSchema.index({ isActive: 1 });
 ProductSchema.index({ isFeatured: 1 });
 ProductSchema.index({ tags: 1 });
 ProductSchema.index({ concerns: 1 });
+ProductSchema.index({ isDeleted: 1, isActive: 1, inStock: 1 });
+ProductSchema.index({ isDeleted: 1, categoryId: 1, isActive: 1 });
 ProductSchema.index({ name: 'text', shortDescription: 'text', subtitle: 'text' });
 
 const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);
