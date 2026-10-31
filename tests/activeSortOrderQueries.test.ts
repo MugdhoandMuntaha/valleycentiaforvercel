@@ -90,3 +90,4 @@ describe('Entity Query Active-Only & sortOrder Filtering Semantics', () => {
         assert.ok(activeCoupons.some(c => c.code === 'PERMANENT'));
     });
 });
+
