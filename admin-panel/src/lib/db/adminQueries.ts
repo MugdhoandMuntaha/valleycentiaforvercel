@@ -15,9 +15,38 @@ import AboutContent from '@/lib/models/AboutContent';
 import ProductCoupon from '@/lib/models/ProductCoupon';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { isUserAdmin } from '@/lib/authUtils';
+import User from '@/lib/models/User';
+import Guest from '@/lib/models/Guest';
+import Order from '@/lib/models/Order';
+import Address from '@/lib/models/Address';
+import Review from '@/lib/models/Review';
+import AuditLog from '@/lib/models/AuditLog';
+import { maskPhoneNumber, normalizePhoneNumber } from '@/lib/phone';
+import { isUserAdmin, hasAdminPermission, AdminPermission } from '@/lib/authUtils';
 import { sanitizeNoSql } from '@/lib/sanitize';
 import { notifyStorefront } from '@/lib/sync';
+
+async function assertAdminPermission(permission: AdminPermission): Promise<{ id: string; email: string; role: string }> {
+    if (process.env.NODE_ENV === 'test') {
+        return { id: 'test_admin_id', email: 'admin@valleycentia.com', role: 'admin' };
+    }
+    const session = await getServerSession(authOptions);
+    const user = session?.user as { id?: string; email?: string; role?: string; permissions?: string[] } | undefined;
+    if (!user) {
+        throw new Error('401: Authentication required');
+    }
+    const allowed = hasAdminPermission({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+    }, permission);
+
+    if (!allowed) {
+        throw new Error('403: Forbidden: Administrative privileges required');
+    }
+    return { id: user.id || 'admin', email: user.email || 'admin', role: user.role || 'admin' };
+}
 
 async function assertAdmin(): Promise<void> {
     if (process.env.NODE_ENV === 'test') return;
@@ -1010,4 +1039,922 @@ export async function assignProductCoupon(productId: string, couponId: string | 
         });
     }
     await notifyStorefront(['products', 'coupons']);
+}
+
+// ============================================================================
+// USERS & GUESTS MANAGEMENT TYPES & ACTIONS
+// ============================================================================
+
+export interface AdminUserRow {
+    id: string;
+    avatar_url: string | null;
+    full_name: string | null;
+    display_name: string | null;
+    email: string;
+    phone: string | null;
+    registered_date: string;
+    last_login: string | null;
+    status: 'active' | 'suspended';
+    is_anonymized: boolean;
+    total_orders: number;
+    total_spend: number;
+}
+
+export interface AdminUsersFilter {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: 'all' | 'active' | 'suspended';
+    dateFrom?: string;
+    dateTo?: string;
+    hasOrders?: 'all' | 'yes' | 'no';
+    sortBy?: 'name' | 'registered' | 'last_login' | 'spend' | 'orders';
+    sortOrder?: 'asc' | 'desc';
+}
+
+export interface AdminGuestRow {
+    id: string;
+    name: string | null;
+    phone: string;
+    email: string | null;
+    first_seen: string;
+    last_seen: string;
+    status: 'active' | 'suspended';
+    order_count: number;
+    total_spend: number;
+    is_merged: boolean;
+}
+
+export interface AdminGuestsFilter {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: 'all' | 'active' | 'suspended';
+    dateFrom?: string;
+    dateTo?: string;
+    hasOrders?: 'all' | 'yes' | 'no';
+    sortBy?: 'name' | 'first_seen' | 'last_seen' | 'spend' | 'orders';
+    sortOrder?: 'asc' | 'desc';
+}
+
+export interface UserProfileDetails {
+    user: {
+        id: string;
+        avatar_url: string | null;
+        full_name: string | null;
+        display_name: string | null;
+        email: string;
+        phone: string | null;
+        role: string;
+        status: 'active' | 'suspended';
+        is_email_verified: boolean;
+        is_phone_verified: boolean;
+        provider: string;
+        registered_date: string;
+        last_login: string | null;
+        is_anonymized: boolean;
+        total_orders: number;
+        total_spend: number;
+    };
+    addresses: Array<{
+        id: string;
+        label: string;
+        full_name: string;
+        phone: string;
+        address_line_1: string;
+        address_line_2: string | null;
+        city: string;
+        state: string | null;
+        postal_code: string | null;
+        country: string;
+        is_default: boolean;
+    }>;
+    orders: Array<{
+        id: string;
+        order_number: string;
+        status: string;
+        payment_status: string;
+        payment_method: string | null;
+        total: number;
+        currency: string;
+        created_at: string;
+        item_count: number;
+        items: Array<{
+            name: string;
+            quantity: number;
+            price: number;
+        }>;
+    }>;
+    reviews: Array<{
+        id: string;
+        product_id: string;
+        rating: number;
+        title: string | null;
+        body: string | null;
+        status: string;
+        is_verified: boolean;
+        is_approved: boolean;
+        helpful_count: number;
+        report_count: number;
+        created_at: string;
+    }>;
+    reports: {
+        filed: Array<{
+            review_id: string;
+            reason: string;
+            details: string | null;
+            created_at: string;
+        }>;
+        received: Array<{
+            review_id: string;
+            reporter_id: string;
+            reason: string;
+            details: string | null;
+            created_at: string;
+        }>;
+    };
+    status_history: Array<{
+        status: string;
+        note: string | null;
+        changed_by: string | null;
+        created_at: string;
+    }>;
+    audit_notes: Array<{
+        id: string;
+        action: string;
+        performed_by: string | null;
+        performed_at: string;
+        details?: Record<string, unknown> | null;
+    }>;
+}
+
+export interface GuestProfileDetails {
+    guest: {
+        id: string;
+        name: string | null;
+        phone: string;
+        email: string | null;
+        status: 'active' | 'suspended';
+        first_seen: string;
+        last_seen: string;
+        order_count: number;
+        total_spend: number;
+        is_merged: boolean;
+        merged_to_user_id: string | null;
+        merged_at: string | null;
+    };
+    addresses: Array<{
+        full_name: string;
+        phone: string;
+        address_line_1: string;
+        address_line_2: string | null;
+        city: string;
+        state: string | null;
+        postal_code: string | null;
+        country: string;
+        created_at: string;
+    }>;
+    orders: Array<{
+        id: string;
+        order_number: string;
+        status: string;
+        payment_status: string;
+        payment_method: string | null;
+        total: number;
+        currency: string;
+        created_at: string;
+    }>;
+    change_history: Array<{
+        field: string;
+        old_value: string | null;
+        new_value: string | null;
+        changed_at: string;
+        reason: string | null;
+    }>;
+    order_metadata: Array<{
+        order_id: string;
+        ip: string | null;
+        user_agent: string | null;
+        created_at: string;
+    }>;
+}
+
+export async function getAdminUsers(filters: AdminUsersFilter = {}): Promise<{
+    users: AdminUserRow[];
+    total: number;
+    page: number;
+    totalPages: number;
+}> {
+    await connectToDatabase();
+    await assertAdminPermission('view_customers');
+
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
+
+    // Base query
+    const query: Record<string, unknown> = {
+        role: { $in: ['customer', 'user'] },
+    };
+
+    if (filters.status && filters.status !== 'all') {
+        query.status = filters.status;
+    }
+
+    if (filters.dateFrom || filters.dateTo) {
+        query.createdAt = {};
+        if (filters.dateFrom) {
+            (query.createdAt as Record<string, unknown>).$gte = new Date(filters.dateFrom);
+        }
+        if (filters.dateTo) {
+            const end = new Date(filters.dateTo);
+            end.setHours(23, 59, 59, 999);
+            (query.createdAt as Record<string, unknown>).$lte = end;
+        }
+    }
+
+    if (filters.search && filters.search.trim()) {
+        const s = filters.search.trim();
+        const normalized = normalizePhoneNumber(s);
+        const searchRegex = new RegExp(s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        const orConditions: Array<Record<string, unknown>> = [
+            { fullName: searchRegex },
+            { displayName: searchRegex },
+            { email: searchRegex },
+        ];
+        if (normalized) {
+            orConditions.push({ phone: normalized });
+        } else {
+            orConditions.push({ phone: searchRegex });
+        }
+        query.$or = orConditions;
+    }
+
+    // 1. Fetch matching users
+    const allMatchingUsers = await User.find(query).lean();
+
+    // 2. Aggregate orders per user to get totalOrders & totalSpend
+    const userIdentifiers: string[] = [];
+    allMatchingUsers.forEach(u => {
+        if (u._id) userIdentifiers.push(String(u._id));
+        if (u.clerkId) userIdentifiers.push(u.clerkId);
+    });
+
+    const orderStats = await Order.aggregate([
+        {
+            $match: {
+                userId: { $in: userIdentifiers },
+                isDeleted: false,
+            },
+        },
+        {
+            $group: {
+                _id: "$userId",
+                count: { $sum: 1 },
+                spend: { $sum: "$total" },
+            },
+        },
+    ]);
+
+    const statsMap = new Map<string, { count: number; spend: number }>();
+    orderStats.forEach(st => {
+        if (st._id) statsMap.set(String(st._id), { count: st.count, spend: st.spend });
+    });
+
+    // 3. Map users with aggregated stats and masked phone
+    let mappedUsers: AdminUserRow[] = allMatchingUsers.map(u => {
+        const uId = String(u._id);
+        const stat1 = statsMap.get(uId);
+        const stat2 = u.clerkId ? statsMap.get(u.clerkId) : undefined;
+        const totalOrders = (stat1?.count || 0) + (stat2?.count || 0);
+        const totalSpend = (stat1?.spend || 0) + (stat2?.spend || 0);
+
+        return {
+            id: uId,
+            avatar_url: u.avatarUrl || null,
+            full_name: u.fullName || u.displayName || 'Unnamed User',
+            display_name: u.displayName || null,
+            email: u.email || '—',
+            phone: maskPhoneNumber(u.phone),
+            registered_date: u.createdAt ? u.createdAt.toISOString() : new Date().toISOString(),
+            last_login: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+            status: (u.status as 'active' | 'suspended') || 'active',
+            is_anonymized: Boolean(u.isAnonymized),
+            total_orders: totalOrders,
+            total_spend: totalSpend,
+        };
+    });
+
+    // 4. Filter by hasOrders
+    if (filters.hasOrders === 'yes') {
+        mappedUsers = mappedUsers.filter(u => u.total_orders > 0);
+    } else if (filters.hasOrders === 'no') {
+        mappedUsers = mappedUsers.filter(u => u.total_orders === 0);
+    }
+
+    // 5. Sort
+    const sortBy = filters.sortBy || 'registered';
+    const sortOrder = filters.sortOrder === 'asc' ? 1 : -1;
+
+    mappedUsers.sort((a, b) => {
+        if (sortBy === 'name') {
+            return sortOrder * (a.full_name || '').localeCompare(b.full_name || '');
+        }
+        if (sortBy === 'spend') {
+            return sortOrder * (a.total_spend - b.total_spend);
+        }
+        if (sortBy === 'orders') {
+            return sortOrder * (a.total_orders - b.total_orders);
+        }
+        if (sortBy === 'last_login') {
+            const timeA = a.last_login ? new Date(a.last_login).getTime() : 0;
+            const timeB = b.last_login ? new Date(b.last_login).getTime() : 0;
+            return sortOrder * (timeA - timeB);
+        }
+        // default: registered
+        const timeA = new Date(a.registered_date).getTime();
+        const timeB = new Date(b.registered_date).getTime();
+        return sortOrder * (timeA - timeB);
+    });
+
+    const total = mappedUsers.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const paginated = mappedUsers.slice((page - 1) * limit, page * limit);
+
+    return {
+        users: paginated,
+        total,
+        page,
+        totalPages,
+    };
+}
+
+export async function getAdminGuests(filters: AdminGuestsFilter = {}): Promise<{
+    guests: AdminGuestRow[];
+    total: number;
+    page: number;
+    totalPages: number;
+}> {
+    await connectToDatabase();
+    await assertAdminPermission('view_customers');
+
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
+
+    const query: Record<string, unknown> = {};
+
+    if (filters.status && filters.status !== 'all') {
+        query.status = filters.status;
+    }
+
+    if (filters.dateFrom || filters.dateTo) {
+        query.firstSeen = {};
+        if (filters.dateFrom) {
+            (query.firstSeen as Record<string, unknown>).$gte = new Date(filters.dateFrom);
+        }
+        if (filters.dateTo) {
+            const end = new Date(filters.dateTo);
+            end.setHours(23, 59, 59, 999);
+            (query.firstSeen as Record<string, unknown>).$lte = end;
+        }
+    }
+
+    if (filters.search && filters.search.trim()) {
+        const s = filters.search.trim();
+        const normalized = normalizePhoneNumber(s);
+        const searchRegex = new RegExp(s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        const orConditions: Array<Record<string, unknown>> = [
+            { name: searchRegex },
+            { email: searchRegex },
+        ];
+        if (normalized) {
+            orConditions.push({ phone: normalized });
+        } else {
+            orConditions.push({ phone: searchRegex });
+        }
+        query.$or = orConditions;
+    }
+
+    if (filters.hasOrders === 'yes') {
+        query.orderCount = { $gt: 0 };
+    } else if (filters.hasOrders === 'no') {
+        query.orderCount = { $eq: 0 };
+    }
+
+    const sortObj: Record<string, 1 | -1> = {};
+    const dir = filters.sortOrder === 'asc' ? 1 : -1;
+    if (filters.sortBy === 'name') sortObj.name = dir;
+    else if (filters.sortBy === 'last_seen') sortObj.lastSeen = dir;
+    else if (filters.sortBy === 'spend') sortObj.totalSpend = dir;
+    else if (filters.sortBy === 'orders') sortObj.orderCount = dir;
+    else sortObj.firstSeen = dir;
+
+    const total = await Guest.countDocuments(query);
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const list = await Guest.find(query)
+        .sort(sortObj)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+
+    const guests: AdminGuestRow[] = list.map(g => ({
+        id: String(g._id),
+        name: g.name || 'Guest User',
+        phone: maskPhoneNumber(g.phone),
+        email: g.email || null,
+        first_seen: g.firstSeen.toISOString(),
+        last_seen: g.lastSeen.toISOString(),
+        status: (g.status as 'active' | 'suspended') || 'active',
+        order_count: g.orderCount || 0,
+        total_spend: g.totalSpend || 0,
+        is_merged: Boolean(g.isMerged),
+    }));
+
+    return {
+        guests,
+        total,
+        page,
+        totalPages,
+    };
+}
+
+export async function getUserProfileDetails(userId: string): Promise<UserProfileDetails> {
+    await connectToDatabase();
+    const admin = await assertAdminPermission('view_customers');
+
+    const user = await User.findOne({
+        $or: [
+            { _id: isValidMongoId(userId) ? userId : null },
+            { clerkId: userId },
+        ],
+    }).lean();
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const userIds = [String(user._id), user.clerkId].filter(Boolean) as string[];
+
+    // Fetch addresses, orders, reviews, reports, statusHistory, auditLogs
+    const [addresses, orders, reviews, filedReports, auditLogs] = await Promise.all([
+        Address.find({ userId: { $in: userIds } }).sort({ isDefault: -1, createdAt: -1 }).lean(),
+        Order.find({ userId: { $in: userIds }, isDeleted: false }).sort({ createdAt: -1 }).lean(),
+        Review.find({ userId: { $in: userIds }, isDeleted: false }).sort({ createdAt: -1 }).lean(),
+        Review.find({ 'reports.userId': { $in: userIds } }).lean(),
+        AuditLog.find({ recordId: String(user._id) }).sort({ performedAt: -1 }).limit(50).lean(),
+    ]);
+
+    // Calculate spend & order stats
+    const totalSpend = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+    // Extract filed reports
+    const filedList: Array<{ review_id: string; reason: string; details: string | null; created_at: string }> = [];
+    filedReports.forEach(rev => {
+        (rev.reports || []).forEach(r => {
+            if (userIds.includes(r.userId)) {
+                filedList.push({
+                    review_id: String(rev._id),
+                    reason: r.reason,
+                    details: r.details || null,
+                    created_at: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
+                });
+            }
+        });
+    });
+
+    // Extract reports received on reviews written by user
+    const receivedList: Array<{ review_id: string; reporter_id: string; reason: string; details: string | null; created_at: string }> = [];
+    reviews.forEach(rev => {
+        (rev.reports || []).forEach(r => {
+            receivedList.push({
+                review_id: String(rev._id),
+                reporter_id: r.userId,
+                reason: r.reason,
+                details: r.details || null,
+                created_at: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
+            });
+        });
+    });
+
+    // Log profile view in AuditLog
+    await AuditLog.create({
+        tableName: 'users',
+        recordId: String(user._id),
+        action: 'VIEW',
+        performedBy: admin.id,
+        metadata: {
+            adminEmail: admin.email,
+            note: 'Profile viewed in admin modal',
+        },
+        performedAt: new Date(),
+    });
+
+    return {
+        user: {
+            id: String(user._id),
+            avatar_url: user.avatarUrl || null,
+            full_name: user.fullName || user.displayName || 'Unnamed User',
+            display_name: user.displayName || null,
+            email: user.email || '',
+            phone: user.phone || null, // Unmasked for modal view
+            role: user.role || 'customer',
+            status: (user.status as 'active' | 'suspended') || 'active',
+            is_email_verified: Boolean(user.isEmailVerified),
+            is_phone_verified: Boolean(user.isPhoneVerified),
+            provider: user.provider || 'clerk',
+            registered_date: user.createdAt.toISOString(),
+            last_login: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
+            is_anonymized: Boolean(user.isAnonymized),
+            total_orders: orders.length,
+            total_spend: totalSpend,
+        },
+        addresses: addresses.map(a => ({
+            id: String(a._id),
+            label: a.label || 'Home',
+            full_name: a.fullName,
+            phone: a.phone,
+            address_line_1: a.addressLine1,
+            address_line_2: a.addressLine2 || null,
+            city: a.city,
+            state: a.state || null,
+            postal_code: a.postalCode || null,
+            country: a.country || 'Bangladesh',
+            is_default: Boolean(a.isDefault),
+        })),
+        orders: orders.map(o => ({
+            id: String(o._id),
+            order_number: o.orderNumber,
+            status: o.status,
+            payment_status: o.paymentStatus,
+            payment_method: o.paymentMethod || null,
+            total: o.total,
+            currency: o.currency || 'BDT',
+            created_at: o.createdAt.toISOString(),
+            item_count: (o.orderItems || []).reduce((sum: number, it: { quantity: number }) => sum + it.quantity, 0),
+            items: (o.orderItems || []).map((it: { productName: string; quantity: number; unitPrice: number }) => ({
+                name: it.productName,
+                quantity: it.quantity,
+                price: it.unitPrice,
+            })),
+        })),
+        reviews: reviews.map(r => ({
+            id: String(r._id),
+            product_id: String(r.productId),
+            rating: r.rating,
+            title: r.title || null,
+            body: r.body || null,
+            status: r.status,
+            is_verified: Boolean(r.isVerified),
+            is_approved: Boolean(r.isApproved),
+            helpful_count: r.helpfulCount || 0,
+            report_count: r.reportCount || 0,
+            created_at: r.createdAt.toISOString(),
+        })),
+        reports: {
+            filed: filedList,
+            received: receivedList,
+        },
+        status_history: (user.statusHistory || []).map(sh => ({
+            status: sh.status,
+            note: sh.note || null,
+            changed_by: sh.changedBy || null,
+            created_at: sh.createdAt.toISOString(),
+        })),
+        audit_notes: auditLogs.map(al => ({
+            id: String(al._id),
+            action: al.action,
+            performed_by: al.performedBy || null,
+            performed_at: al.performedAt.toISOString(),
+            details: al.metadata || al.newData || null,
+        })),
+    };
+}
+
+export async function getGuestProfileDetails(guestIdOrPhone: string): Promise<GuestProfileDetails> {
+    await connectToDatabase();
+    const admin = await assertAdminPermission('view_customers');
+
+    const guest = await Guest.findOne({
+        $or: [
+            { _id: isValidMongoId(guestIdOrPhone) ? guestIdOrPhone : null },
+            { phone: guestIdOrPhone },
+            { phone: normalizePhoneNumber(guestIdOrPhone) || 'none' },
+        ],
+    }).lean();
+
+    if (!guest) {
+        throw new Error('Guest record not found');
+    }
+
+    const orders = await Order.find({
+        $or: [
+            { _id: { $in: guest.orderIds } },
+            { shippingPhone: guest.phone },
+        ],
+        isDeleted: false,
+    }).sort({ createdAt: -1 }).lean();
+
+    // Log guest profile view
+    await AuditLog.create({
+        tableName: 'guests',
+        recordId: String(guest._id),
+        action: 'VIEW',
+        performedBy: admin.id,
+        metadata: {
+            adminEmail: admin.email,
+            note: 'Guest profile viewed in admin modal',
+        },
+        performedAt: new Date(),
+    });
+
+    return {
+        guest: {
+            id: String(guest._id),
+            name: guest.name || 'Guest User',
+            phone: guest.phone, // Unmasked for modal view
+            email: guest.email || null,
+            status: (guest.status as 'active' | 'suspended') || 'active',
+            first_seen: guest.firstSeen.toISOString(),
+            last_seen: guest.lastSeen.toISOString(),
+            order_count: guest.orderCount || orders.length,
+            total_spend: guest.totalSpend || orders.reduce((sum, o) => sum + (o.total || 0), 0),
+            is_merged: Boolean(guest.isMerged),
+            merged_to_user_id: guest.mergedToUserId || null,
+            merged_at: guest.mergedAt ? guest.mergedAt.toISOString() : null,
+        },
+        addresses: (guest.addresses || []).map(a => ({
+            full_name: a.fullName,
+            phone: a.phone,
+            address_line_1: a.addressLine1,
+            address_line_2: a.addressLine2 || null,
+            city: a.city,
+            state: a.state || null,
+            postal_code: a.postalCode || null,
+            country: a.country || 'Bangladesh',
+            created_at: a.createdAt.toISOString(),
+        })),
+        orders: orders.map(o => ({
+            id: String(o._id),
+            order_number: o.orderNumber,
+            status: o.status,
+            payment_status: o.paymentStatus,
+            payment_method: o.paymentMethod || null,
+            total: o.total,
+            currency: o.currency || 'BDT',
+            created_at: o.createdAt.toISOString(),
+        })),
+        change_history: (guest.changeHistory || []).map(ch => ({
+            field: ch.field,
+            old_value: ch.oldValue || null,
+            new_value: ch.newValue || null,
+            changed_at: ch.changedAt.toISOString(),
+            reason: ch.reason || null,
+        })),
+        order_metadata: (guest.orderMetadata || []).map(om => ({
+            order_id: om.orderId,
+            ip: om.ip || null,
+            user_agent: om.userAgent || null,
+            created_at: om.createdAt.toISOString(),
+        })),
+    };
+}
+
+export async function suspendUser(userId: string, reason: string): Promise<{ success: boolean; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('suspend_users');
+        const cleanReason = sanitizeNoSql(reason) || 'Suspended by administrator';
+
+        const user = await User.findOne({
+            $or: [{ _id: isValidMongoId(userId) ? userId : null }, { clerkId: userId }],
+        });
+
+        if (!user) return { success: false, error: 'User not found' };
+
+        user.status = 'suspended';
+        user.statusHistory.push({
+            status: 'suspended',
+            note: cleanReason,
+            changedBy: admin.id,
+            createdAt: new Date(),
+        });
+        await user.save();
+
+        await AuditLog.create({
+            tableName: 'users',
+            recordId: String(user._id),
+            action: 'SUSPEND',
+            newData: { status: 'suspended', reason: cleanReason },
+            performedBy: admin.id,
+            performedAt: new Date(),
+        });
+
+        return { success: true, error: null };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to suspend user' };
+    }
+}
+
+export async function reactivateUser(userId: string, note?: string): Promise<{ success: boolean; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('suspend_users');
+        const cleanNote = sanitizeNoSql(note) || 'Reactivated by administrator';
+
+        const user = await User.findOne({
+            $or: [{ _id: isValidMongoId(userId) ? userId : null }, { clerkId: userId }],
+        });
+
+        if (!user) return { success: false, error: 'User not found' };
+
+        user.status = 'active';
+        user.statusHistory.push({
+            status: 'active',
+            note: cleanNote,
+            changedBy: admin.id,
+            createdAt: new Date(),
+        });
+        await user.save();
+
+        await AuditLog.create({
+            tableName: 'users',
+            recordId: String(user._id),
+            action: 'REACTIVATE',
+            newData: { status: 'active', note: cleanNote },
+            performedBy: admin.id,
+            performedAt: new Date(),
+        });
+
+        return { success: true, error: null };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to reactivate user' };
+    }
+}
+
+export async function suspendGuest(guestId: string, reason: string): Promise<{ success: boolean; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('suspend_users');
+        const cleanReason = sanitizeNoSql(reason) || 'Suspended by administrator';
+
+        const guest = await Guest.findById(guestId);
+        if (!guest) return { success: false, error: 'Guest not found' };
+
+        guest.status = 'suspended';
+        guest.changeHistory.push({
+            field: 'status',
+            oldValue: 'active',
+            newValue: 'suspended',
+            changedAt: new Date(),
+            reason: cleanReason,
+        });
+        await guest.save();
+
+        await AuditLog.create({
+            tableName: 'guests',
+            recordId: String(guest._id),
+            action: 'SUSPEND',
+            newData: { status: 'suspended', reason: cleanReason },
+            performedBy: admin.id,
+            performedAt: new Date(),
+        });
+
+        return { success: true, error: null };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to suspend guest' };
+    }
+}
+
+export async function reactivateGuest(guestId: string, note?: string): Promise<{ success: boolean; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('suspend_users');
+        const cleanNote = sanitizeNoSql(note) || 'Reactivated by administrator';
+
+        const guest = await Guest.findById(guestId);
+        if (!guest) return { success: false, error: 'Guest not found' };
+
+        guest.status = 'active';
+        guest.changeHistory.push({
+            field: 'status',
+            oldValue: 'suspended',
+            newValue: 'active',
+            changedAt: new Date(),
+            reason: cleanNote,
+        });
+        await guest.save();
+
+        await AuditLog.create({
+            tableName: 'guests',
+            recordId: String(guest._id),
+            action: 'REACTIVATE',
+            newData: { status: 'active', note: cleanNote },
+            performedBy: admin.id,
+            performedAt: new Date(),
+        });
+
+        return { success: true, error: null };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to reactivate guest' };
+    }
+}
+
+export async function exportCustomerData(id: string, isGuest: boolean): Promise<{ data: string | null; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('export_data');
+
+        let exportPayload: Record<string, unknown> = {};
+
+        if (isGuest) {
+            const guestDetails = await getGuestProfileDetails(id);
+            exportPayload = {
+                type: 'guest',
+                profile: guestDetails.guest,
+                addresses: guestDetails.addresses,
+                orders: guestDetails.orders,
+                changeHistory: guestDetails.change_history,
+            };
+            await AuditLog.create({
+                tableName: 'guests',
+                recordId: id,
+                action: 'EXPORT',
+                performedBy: admin.id,
+                performedAt: new Date(),
+            });
+        } else {
+            const userDetails = await getUserProfileDetails(id);
+            // Strict security: omit passwords, hashes, card info
+            exportPayload = {
+                type: 'registered_user',
+                profile: userDetails.user,
+                addresses: userDetails.addresses,
+                orders: userDetails.orders,
+                reviews: userDetails.reviews,
+                statusHistory: userDetails.status_history,
+            };
+            await AuditLog.create({
+                tableName: 'users',
+                recordId: id,
+                action: 'EXPORT',
+                performedBy: admin.id,
+                performedAt: new Date(),
+            });
+        }
+
+        return { data: JSON.stringify(exportPayload, null, 2), error: null };
+    } catch (err) {
+        return { data: null, error: err instanceof Error ? err.message : 'Failed to export customer data' };
+    }
+}
+
+export async function anonymizeCustomer(userId: string): Promise<{ success: boolean; error: string | null }> {
+    await connectToDatabase();
+    try {
+        const admin = await assertAdminPermission('anonymize_users');
+
+        const user = await User.findOne({
+            $or: [{ _id: isValidMongoId(userId) ? userId : null }, { clerkId: userId }],
+        });
+
+        if (!user) return { success: false, error: 'User not found' };
+
+        const uId = String(user._id);
+
+        // Anonymize personal info
+        user.fullName = 'Anonymized User';
+        user.displayName = 'Anonymized';
+        user.email = `anonymized_${uId}@valleycentia.local`;
+        user.phone = null;
+        user.avatarUrl = null;
+        user.status = 'suspended';
+        user.isAnonymized = true;
+        user.statusHistory.push({
+            status: 'suspended',
+            note: 'Account anonymized under privacy request',
+            changedBy: admin.id,
+            createdAt: new Date(),
+        });
+        await user.save();
+
+        // Clear user addresses
+        await Address.deleteMany({ userId: { $in: [uId, user.clerkId].filter(Boolean) } });
+
+        await AuditLog.create({
+            tableName: 'users',
+            recordId: uId,
+            action: 'ANONYMIZE',
+            newData: { anonymizedAt: new Date() },
+            performedBy: admin.id,
+            performedAt: new Date(),
+        });
+
+        return { success: true, error: null };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to anonymize user' };
+    }
+}
+
+function isValidMongoId(str: string): boolean {
+    return /^[0-9a-fA-F]{24}$/.test(str);
 }

@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         }
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const userAgent = req.headers.get('user-agent') || null;
 
         const result = await OrderService.initiateOnlinePayment({
             userId,
@@ -56,6 +57,8 @@ export async function POST(req: NextRequest) {
             couponCode,
             idempotencyKey,
             baseUrl,
+            ip: clientIp,
+            userAgent,
         });
 
         if (!result.success || !result.gatewayUrl) {

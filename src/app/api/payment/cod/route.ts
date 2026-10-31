@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
         const idempotencyKey = req.headers.get('idempotency-key') || body.idempotencyKey || null;
 
         // 3. Delegate to Domain Service
+        const userAgent = req.headers.get('user-agent') || null;
         const result = await OrderService.createCodOrder({
             userId,
             email,
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
             shipping,
             couponCode,
             idempotencyKey,
+            ip: clientIp,
+            userAgent,
         });
 
         return NextResponse.json(result);

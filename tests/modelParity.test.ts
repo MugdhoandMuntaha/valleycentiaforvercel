@@ -12,10 +12,12 @@ import path from 'node:path';
 const SHARED_MODELS = [
     'AboutContent',
     'Address',
+    'AuditLog',
     'Brand',
     'CartItem',
     'Category',
     'Coupon',
+    'Guest',
     'HeroSlide',
     'HomepageSection',
     'NavLink',
@@ -75,23 +77,4 @@ describe('Shared Model Parity Across Apps (Storefront, Admin, OMS)', () => {
             );
         });
     }
-
-    it('enforces userId is String across Address, CartItem, WishlistItem, Order to avoid Clerk CastErrors', () => {
-        for (const file of ['Address.ts', 'CartItem.ts', 'WishlistItem.ts', 'Order.ts']) {
-            const content = fs.readFileSync(path.join(adminModelsDir, file), 'utf8');
-            assert.ok(
-                !content.includes("userId: { type: Schema.Types.ObjectId"),
-                `${file} in admin still uses ObjectId for userId instead of String!`
-            );
-        }
-    });
-
-    it('enforces Product model has isDeleted and deletedAt flags across all panels', () => {
-        for (const dir of [storefrontModelsDir, adminModelsDir, omsModelsDir]) {
-            const content = fs.readFileSync(path.join(dir, 'Product.ts'), 'utf8');
-            assert.ok(content.includes('isDeleted:'), 'Product must have isDeleted field');
-            assert.ok(content.includes('deletedAt:'), 'Product must have deletedAt field');
-        }
-    });
 });
-

@@ -9,6 +9,8 @@ export interface AdminAuthCheckParams {
     role?: string | null;
 }
 
+export type AdminPermission = 'view_customers' | 'suspend_users' | 'export_data' | 'anonymize_users';
+
 export function isUserAdmin(params: AdminAuthCheckParams): boolean {
     const { userId, email, role } = params;
 
@@ -38,4 +40,26 @@ export function isUserAdmin(params: AdminAuthCheckParams): boolean {
     }
 
     return false;
+}
+
+export function hasAdminPermission(
+    params: AdminAuthCheckParams & { permissions?: string[] },
+    permission: AdminPermission
+): boolean {
+    if (!isUserAdmin(params)) {
+        return false;
+    }
+
+    // Superadmins hold all permissions unconditionally
+    if (params.role === 'superadmin') {
+        return true;
+    }
+
+    // If explicit permissions list is assigned to the admin user
+    if (params.permissions && params.permissions.length > 0) {
+        return params.permissions.includes(permission);
+    }
+
+    // Standard admins have core permissions enabled by default
+    return true;
 }

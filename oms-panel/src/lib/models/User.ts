@@ -2,6 +2,14 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export type UserRole = 'customer' | 'admin';
+export type UserStatus = 'active' | 'suspended';
+
+export interface IUserStatusHistory {
+    status: UserStatus;
+    note: string | null;
+    changedBy: string | null;
+    createdAt: Date;
+}
 
 export interface IUser extends Document {
     _id: mongoose.Types.ObjectId;
@@ -15,6 +23,11 @@ export interface IUser extends Document {
     dateOfBirth: Date | null;
     gender: string | null;
     role: UserRole;
+    status: UserStatus;
+    statusHistory: IUserStatusHistory[];
+    lastLoginAt: Date | null;
+    isAnonymized: boolean;
+    permissions: string[];
     isEmailVerified: boolean;
     isPhoneVerified: boolean;
     provider: 'credentials' | 'google' | 'clerk';
@@ -22,6 +35,16 @@ export interface IUser extends Document {
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
 }
+
+const UserStatusHistorySchema = new Schema(
+    {
+        status: { type: String, enum: ['active', 'suspended'], required: true },
+        note: { type: String, default: null },
+        changedBy: { type: String, default: null },
+        createdAt: { type: Date, default: Date.now },
+    },
+    { _id: true }
+);
 
 const UserSchema = new Schema<IUser>(
     {
@@ -35,6 +58,11 @@ const UserSchema = new Schema<IUser>(
         dateOfBirth: { type: Date, default: null },
         gender: { type: String, default: null },
         role: { type: String, enum: ['customer', 'admin'], default: 'customer', lowercase: true, trim: true },
+        status: { type: String, enum: ['active', 'suspended'], default: 'active', lowercase: true, trim: true },
+        statusHistory: [UserStatusHistorySchema],
+        lastLoginAt: { type: Date, default: null },
+        isAnonymized: { type: Boolean, default: false },
+        permissions: { type: [String], default: [] },
         isEmailVerified: { type: Boolean, default: false },
         isPhoneVerified: { type: Boolean, default: false },
         provider: { type: String, enum: ['credentials', 'google', 'clerk'], default: 'clerk' },
@@ -44,6 +72,8 @@ const UserSchema = new Schema<IUser>(
 
 // Indexes
 UserSchema.index({ phone: 1 });
+UserSchema.index({ status: 1 });
+UserSchema.index({ createdAt: -1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function (next) {

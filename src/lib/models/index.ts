@@ -25,9 +25,12 @@ export { default as Perk } from './Perk';
 export { default as SiteSetting } from './SiteSetting';
 export { default as AboutContent } from './AboutContent';
 export { default as AuditLog } from './AuditLog';
+export { default as Guest } from './Guest';
 
 // Re-export interfaces
-export type { IUser, UserRole } from './User';
+export type { IUser, UserRole, UserStatus, IUserStatusHistory } from './User';
+export type { IGuest, IGuestAddress, IGuestChangeHistory, IGuestOrderMetadata } from './Guest';
+export type { IAuditLog, AuditAction } from './AuditLog';
 export type { IProduct } from './Product';
 export type { IBrand } from './Brand';
 export type { ICategory } from './Category';

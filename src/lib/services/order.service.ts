@@ -6,6 +6,7 @@ import { updateStockForOrder, restoreStockForOrder } from '@/lib/db/queries';
 import { validateAndCalculateOrder, IncomingOrderItem, VerifiedOrderCalculation } from '@/lib/orderValidation';
 import { jobQueue } from '@/lib/queue/jobQueue';
 import { VALID_ORDER_TRANSITIONS } from '@/lib/constants/orderTransitions';
+import { GuestService } from '@/lib/services/guest.service';
 export { VALID_ORDER_TRANSITIONS };
 
 export interface UpdateOrderStatusParams {
@@ -44,6 +45,8 @@ export interface CreateOrderParams {
     shipping?: number;
     couponCode?: string | null;
     idempotencyKey?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
 }
 
 export interface OrderResult {
@@ -193,6 +196,33 @@ export class OrderService {
             throw new Error('Failed to create order in database');
         }
 
+        // Upsert guest record for guest orders
+        if (isGuest && params.address?.phone) {
+            try {
+                await GuestService.upsertGuest({
+                    phone: params.address.phone,
+                    name: params.address.full_name,
+                    email: params.email || null,
+                    address: {
+                        fullName: params.address.full_name,
+                        phone: params.address.phone,
+                        addressLine1: params.address.address_line_1,
+                        addressLine2: params.address.address_line_2,
+                        city: params.address.city,
+                        state: params.address.state,
+                        postalCode: params.address.postal_code,
+                        country: params.address.country,
+                    },
+                    orderId: order._id,
+                    orderTotal: calculation.total,
+                    ip: params.ip,
+                    userAgent: params.userAgent,
+                });
+            } catch (guestErr) {
+                console.warn('[GuestService] Failed to upsert guest on COD order:', guestErr);
+            }
+        }
+
         // 4. Update stock quantities atomically
         await updateStockForOrder(calculation.orderItems);
 
@@ -305,6 +335,33 @@ export class OrderService {
 
         if (!order) {
             throw new Error('Failed to create order');
+        }
+
+        // Upsert guest record for guest orders
+        if (isGuest && params.address?.phone) {
+            try {
+                await GuestService.upsertGuest({
+                    phone: params.address.phone,
+                    name: params.address.full_name,
+                    email: params.email || null,
+                    address: {
+                        fullName: params.address.full_name,
+                        phone: params.address.phone,
+                        addressLine1: params.address.address_line_1,
+                        addressLine2: params.address.address_line_2,
+                        city: params.address.city,
+                        state: params.address.state,
+                        postalCode: params.address.postal_code,
+                        country: params.address.country,
+                    },
+                    orderId: order._id,
+                    orderTotal: calculation.total,
+                    ip: params.ip,
+                    userAgent: params.userAgent,
+                });
+            } catch (guestErr) {
+                console.warn('[GuestService] Failed to upsert guest on online order:', guestErr);
+            }
         }
 
         // 4. Initiate SSLCommerz Session

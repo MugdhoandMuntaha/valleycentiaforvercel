@@ -19,11 +19,13 @@ import {
     Settings,
     Tag,
     SplitSquareVertical,
+    Users,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 
 const navItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { label: 'Users', href: '/admin/users', icon: Users },
     { label: 'Products', href: '/admin/products', icon: Package },
     { label: 'Brands', href: '/admin/brands', icon: Crown },
     { label: 'Visible Changes', href: '/admin/visible-changes', icon: SplitSquareVertical },
