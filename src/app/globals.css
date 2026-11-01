@@ -64,8 +64,34 @@
 }
 
 html {
-  scroll-behavior: smooth;
   overflow-x: clip;
+}
+
+/* Opt-in smooth scroll class for dedicated UI controls */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Ensure anchor targets account for fixed site header */
+[id] {
+  scroll-margin-top: 140px;
+}
+#reviews,
+#write-review-container {
+  scroll-margin-top: 150px;
 }
 
 body {
@@ -2175,4 +2201,64 @@ a {
     min-width: var(--brand-cell-width, 124px) !important;
     height: var(--brand-cell-height, 76px) !important;
   }
+}
+
+
+/* Accessible Clamped & Expandable Text styles */
+.vc-expandable-text-wrapper {
+  overflow-anchor: none;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.vc-expandable-text-wrapper.is-clickable:hover {
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+.vc-expandable-text-wrapper.is-clickable:active {
+  background-color: rgba(0, 0, 0, 0.035);
+}
+
+.vc-expand-btn:focus-visible {
+  outline: 2px solid #2e7d32;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-expandable-content,
+  .vc-expand-btn {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/* Text Selection Behavior */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Always selectable: inputs, textareas, selects, contenteditable, .selectable */
+input,
+textarea,
+select,
+[contenteditable="true"],
+.selectable,
+.selectable * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* Admin panel tables, data cells, and user/guest modals */
+.admin-table,
+.admin-table *,
+.admin-modal,
+.admin-modal * {
+  -webkit-user-select: text;
+  user-select: text;
 }
