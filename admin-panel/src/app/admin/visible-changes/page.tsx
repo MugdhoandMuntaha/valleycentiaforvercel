@@ -12,6 +12,7 @@ import {
     getActiveProductsSimple,
 } from '@/lib/db/adminQueries';
 import type { AdminVisibleChange, VisibleChangeFormData } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 const emptyForm: VisibleChangeFormData = {
     product_id: null, before_image: '', after_image: '',
@@ -36,6 +37,18 @@ export default function AdminVisibleChangesPage() {
 
     const [deleteTarget, setDeleteTarget] = useState<AdminVisibleChange | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-visible-change-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-visible-change-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
 
     useEffect(() => { loadData(); }, []);
 

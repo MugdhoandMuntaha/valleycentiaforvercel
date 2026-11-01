@@ -11,6 +11,7 @@ import {
     getAdminBrands, createBrand, updateBrand, deleteBrand,
 } from '@/lib/db/adminQueries';
 import type { AdminBrand, BrandFormData } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 /* ===== Slug helper ===== */
 function toSlug(str: string) {
@@ -40,6 +41,18 @@ export default function AdminBrandsPage() {
     /* ===== Delete state ===== */
     const [deleteTarget, setDeleteTarget] = useState<AdminBrand | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-brand-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-brand-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
 
     useEffect(() => { loadBrands(); }, []);
 

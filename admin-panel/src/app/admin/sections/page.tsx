@@ -9,6 +9,7 @@ import {
     getAdminSections, createSection, updateSection, deleteSection,
 } from '@/lib/db/adminQueries';
 import type { AdminSection, SectionFormData } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 const SECTION_TYPES = [
     { value: 'best_sellers', label: 'Best Sellers' },
@@ -38,6 +39,18 @@ export default function AdminSectionsPage() {
 
     const [deleteTarget, setDeleteTarget] = useState<AdminSection | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-section-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-section-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
 
     useEffect(() => { loadSections(); }, []);
 

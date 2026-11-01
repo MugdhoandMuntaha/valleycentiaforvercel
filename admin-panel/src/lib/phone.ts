@@ -73,3 +73,4 @@ export function maskPhoneNumber(phone: string | null | undefined): string {
 
     return '••••••••';
 }
+

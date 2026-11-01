@@ -62,10 +62,7 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-  overflow-x: hidden;
-}
+html {}
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -1129,3 +1126,18 @@ a {
   background-size: 200% 100% !important;
   animation: shimmer 1.5s infinite linear !important;
 }
+
+/* Admin Panel Selection Architecture (Tier A) */
+table,
+td,
+th,
+input,
+textarea,
+select,
+.selectable,
+.selectable * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+

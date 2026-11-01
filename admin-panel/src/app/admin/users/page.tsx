@@ -13,9 +13,11 @@ import {
     AdminUserRow, AdminGuestRow, UserProfileDetails, GuestProfileDetails,
     AdminUsersFilter, AdminGuestsFilter
 } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 export default function AdminUsersPage() {
     const [activeTab, setActiveTab] = useState<'registered' | 'guests'>('registered');
+    const [tableError, setTableError] = useState<string | null>(null);
 
     // Registered users state
     const [users, setUsers] = useState<AdminUserRow[]>([]);
@@ -58,53 +60,69 @@ export default function AdminUsersPage() {
     // Accessibility Focus Trap ref
     const modalRef = useRef<HTMLDivElement>(null);
 
-    // Load registered users
+    // Load registered users via real API endpoint
     const loadUsers = useCallback(async () => {
         setUsersLoading(true);
+        setTableError(null);
         try {
-            const filters: AdminUsersFilter = {
-                page: userPage,
-                limit: 10,
+            const params = new URLSearchParams({
+                page: String(userPage),
+                limit: '10',
                 search: searchTerm,
                 status: statusFilter,
-                dateFrom: dateFrom || undefined,
-                dateTo: dateTo || undefined,
                 hasOrders: hasOrdersFilter,
-                sortBy: sortBy === 'date' ? 'registered' : (sortBy as 'name' | 'spend' | 'orders' | 'last_login'),
+                sortBy: sortBy === 'date' ? 'registered' : sortBy,
                 sortOrder,
-            };
-            const res = await getAdminUsers(filters);
-            setUsers(res.users);
-            setUserTotal(res.total);
-            setUserTotalPages(res.totalPages);
+            });
+            if (dateFrom) params.set('dateFrom', dateFrom);
+            if (dateTo) params.set('dateTo', dateTo);
+
+            const res = await fetch(`/api/admin/users?${params.toString()}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}: Failed to load users`);
+            }
+            setUsers(data.users || []);
+            setUserTotal(data.total || 0);
+            setUserTotalPages(data.totalPages || 1);
         } catch (err) {
             console.error('Failed to load users:', err);
+            setTableError(err instanceof Error ? err.message : 'Failed to load users from database');
+            setUsers([]);
         } finally {
             setUsersLoading(false);
         }
     }, [userPage, searchTerm, statusFilter, dateFrom, dateTo, hasOrdersFilter, sortBy, sortOrder]);
 
-    // Load guests
+    // Load guests via real API endpoint
     const loadGuests = useCallback(async () => {
         setGuestsLoading(true);
+        setTableError(null);
         try {
-            const filters: AdminGuestsFilter = {
-                page: guestPage,
-                limit: 10,
+            const params = new URLSearchParams({
+                page: String(guestPage),
+                limit: '10',
                 search: searchTerm,
                 status: statusFilter,
-                dateFrom: dateFrom || undefined,
-                dateTo: dateTo || undefined,
                 hasOrders: hasOrdersFilter,
-                sortBy: sortBy === 'date' ? 'first_seen' : (sortBy as 'name' | 'spend' | 'orders' | 'last_seen'),
+                sortBy: sortBy === 'date' ? 'first_seen' : sortBy,
                 sortOrder,
-            };
-            const res = await getAdminGuests(filters);
-            setGuests(res.guests);
-            setGuestTotal(res.total);
-            setGuestTotalPages(res.totalPages);
+            });
+            if (dateFrom) params.set('dateFrom', dateFrom);
+            if (dateTo) params.set('dateTo', dateTo);
+
+            const res = await fetch(`/api/admin/guests?${params.toString()}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}: Failed to load guests`);
+            }
+            setGuests(data.guests || []);
+            setGuestTotal(data.total || 0);
+            setGuestTotalPages(data.totalPages || 1);
         } catch (err) {
             console.error('Failed to load guests:', err);
+            setTableError(err instanceof Error ? err.message : 'Failed to load guests from database');
+            setGuests([]);
         } finally {
             setGuestsLoading(false);
         }
@@ -118,7 +136,7 @@ export default function AdminUsersPage() {
         }
     }, [activeTab, loadUsers, loadGuests]);
 
-    // Open User Modal
+    // Open User Modal via real API endpoint
     const handleOpenUserModal = async (id: string) => {
         setSelectedUserId(id);
         setSelectedGuestId(null);
@@ -129,8 +147,12 @@ export default function AdminUsersPage() {
         setActionMessage(null);
 
         try {
-            const details = await getUserProfileDetails(id);
-            setModalDataUser(details);
+            const res = await fetch(`/api/admin/users/${id}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}: Could not load user profile`);
+            }
+            setModalDataUser(data);
         } catch (err) {
             setModalError(err instanceof Error ? err.message : 'Could not load user profile');
         } finally {
@@ -138,7 +160,7 @@ export default function AdminUsersPage() {
         }
     };
 
-    // Open Guest Modal
+    // Open Guest Modal via real API endpoint
     const handleOpenGuestModal = async (id: string) => {
         setSelectedGuestId(id);
         setSelectedUserId(null);
@@ -149,15 +171,18 @@ export default function AdminUsersPage() {
         setActionMessage(null);
 
         try {
-            const details = await getGuestProfileDetails(id);
-            setModalDataGuest(details);
+            const res = await fetch(`/api/admin/guests/${id}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `HTTP ${res.status}: Could not load guest profile`);
+            }
+            setModalDataGuest(data);
         } catch (err) {
             setModalError(err instanceof Error ? err.message : 'Could not load guest profile');
         } finally {
             setModalLoading(false);
         }
     };
-
     const closeModal = () => {
         setSelectedUserId(null);
         setSelectedGuestId(null);
@@ -167,6 +192,12 @@ export default function AdminUsersPage() {
         setShowSuspendInput(false);
         setActionMessage(null);
     };
+
+    useOverlayHistory({
+        overlayId: 'admin-customer-profile-modal',
+        isOpen: Boolean(selectedUserId || selectedGuestId),
+        onClose: closeModal,
+    });
 
     // Accessibility: Escape key and Focus Trap
     useEffect(() => {
@@ -184,25 +215,30 @@ export default function AdminUsersPage() {
                 const last = focusable[focusable.length - 1];
 
                 if (e.shiftKey && document.activeElement === first) {
-                    last.focus();
+                    last.focus({ preventScroll: true });
                     e.preventDefault();
                 } else if (!e.shiftKey && document.activeElement === last) {
-                    first.focus();
+                    first.focus({ preventScroll: true });
                     e.preventDefault();
                 }
             }
         };
 
+        let prevScrollY = 0;
         if (selectedUserId || selectedGuestId) {
+            prevScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
             window.addEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'hidden';
         } else {
-            document.body.style.overflow = 'unset';
+            document.body.style.overflow = '';
         }
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
-            document.body.style.overflow = 'unset';
+            document.body.style.overflow = '';
+            if (prevScrollY > 0 && typeof window !== 'undefined' && window.scrollY !== prevScrollY) {
+                window.scrollTo({ top: prevScrollY, left: 0, behavior: 'instant' as ScrollBehavior });
+            }
         };
     }, [selectedUserId, selectedGuestId]);
 
@@ -481,7 +517,35 @@ export default function AdminUsersPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {(activeTab === 'registered' ? usersLoading : guestsLoading) ? (
+                            {tableError ? (
+                                <tr>
+                                    <td colSpan={9} style={{ padding: 48, textAlign: 'center' }}>
+                                        <AlertCircle size={36} style={{ color: 'var(--color-error, #ef4444)', margin: '0 auto 12px' }} />
+                                        <div style={{ fontWeight: 600, fontSize: 16, color: 'var(--color-text-primary)' }}>
+                                            Failed to load {activeTab === 'registered' ? 'registered users' : 'guests'}
+                                        </div>
+                                        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 4 }}>{tableError}</div>
+                                        <button
+                                            onClick={() => (activeTab === 'registered' ? loadUsers() : loadGuests())}
+                                            style={{
+                                                marginTop: 16,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                padding: '8px 16px',
+                                                background: 'var(--color-accent)',
+                                                color: '#000',
+                                                border: 'none',
+                                                borderRadius: 6,
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <RefreshCw size={14} /> Retry
+                                        </button>
+                                    </td>
+                                </tr>
+                            ) : (activeTab === 'registered' ? usersLoading : guestsLoading) ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
                                         {Array.from({ length: 9 }).map((_, j) => (
@@ -781,8 +845,14 @@ export default function AdminUsersPage() {
                                                     Contact & Account Details
                                                 </h4>
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
-                                                    <div><span style={{ color: 'var(--color-text-muted)' }}>Email:</span> {selectedUserId ? modalDataUser?.user.email : (modalDataGuest?.guest.email || '—')}</div>
-                                                    <div><span style={{ color: 'var(--color-text-muted)' }}>Phone (Full):</span> {selectedUserId ? modalDataUser?.user.phone : modalDataGuest?.guest.phone}</div>
+                                                    <div>
+                                                        <span style={{ color: 'var(--color-text-muted)' }}>Email:</span>{' '}
+                                                        {(selectedUserId ? modalDataUser?.user.email : modalDataGuest?.guest.email) || '—'}
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ color: 'var(--color-text-muted)' }}>Phone (Full):</span>{' '}
+                                                        {(selectedUserId ? modalDataUser?.user.phone : modalDataGuest?.guest.phone) || '—'}
+                                                    </div>
                                                     <div><span style={{ color: 'var(--color-text-muted)' }}>Created / First Seen:</span> {new Date(selectedUserId ? modalDataUser?.user.registered_date! : modalDataGuest?.guest.first_seen!).toLocaleString()}</div>
                                                     <div><span style={{ color: 'var(--color-text-muted)' }}>Last Activity:</span> {new Date(selectedUserId ? (modalDataUser?.user.last_login || modalDataUser?.user.registered_date!) : modalDataGuest?.guest.last_seen!).toLocaleString()}</div>
                                                     {selectedUserId && (
@@ -838,8 +908,12 @@ export default function AdminUsersPage() {
                                                 (selectedUserId ? modalDataUser?.addresses : modalDataGuest?.addresses)?.map((a, i) => (
                                                     <div key={i} style={{ background: 'var(--color-bg-tertiary)', padding: 14, borderRadius: 'var(--radius-md)', fontSize: 13 }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                                            <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{a.full_name} ({a.phone})</div>
-                                                            {'is_default' in a && a.is_default && <span style={{ fontSize: 10, background: 'var(--color-accent)', color: '#000', padding: '2px 6px', borderRadius: 3, fontWeight: 700 }}>DEFAULT</span>}
+                                                            <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                                                                {a.full_name} ({a.phone})
+                                                            </div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {'is_default' in a && a.is_default && <span style={{ fontSize: 10, background: 'var(--color-accent)', color: '#000', padding: '2px 6px', borderRadius: 3, fontWeight: 700 }}>DEFAULT</span>}
+                                                            </div>
                                                         </div>
                                                         <div style={{ color: 'var(--color-text-secondary)' }}>{a.address_line_1} {a.address_line_2 || ''}</div>
                                                         <div style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{a.city}, {a.state || ''} {a.postal_code || ''}, {a.country}</div>
@@ -1122,3 +1196,4 @@ const footerBtnStyle: React.CSSProperties = {
     alignItems: 'center',
     gap: 6,
 };
+

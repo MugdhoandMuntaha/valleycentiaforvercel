@@ -11,6 +11,7 @@ import {
     getAdminHeroSlides, createHeroSlide, updateHeroSlide, deleteHeroSlide,
 } from '@/lib/db/adminQueries';
 import type { AdminHeroSlide, HeroSlideFormData } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 /* ===== Default form state ===== */
 const emptyForm: HeroSlideFormData = {
@@ -36,6 +37,18 @@ export default function AdminHeroSlidesPage() {
     // Delete confirmation
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-hero-slide-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-hero-slide-delete-dialog',
+        isOpen: Boolean(deleteId),
+        onClose: () => setDeleteId(null),
+    });
 
     useEffect(() => { loadSlides(); }, []);
 

@@ -11,6 +11,7 @@ import {
     getBrandsAndCategories,
 } from '@/lib/db/adminQueries';
 import type { AdminNavLink, NavLinkFormData, CategoryOption } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 const emptyForm: NavLinkFormData = {
     parent_id: null, label: '', href: '#',
@@ -37,6 +38,18 @@ export default function AdminNavigationPage() {
 
     const [deleteTarget, setDeleteTarget] = useState<AdminNavLink | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-nav-link-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-nav-link-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
 
     const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 

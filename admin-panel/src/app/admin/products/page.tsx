@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAdminProducts, deleteProduct } from '@/lib/db/adminQueries';
 import type { AdminProduct } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 export default function AdminProductsPage() {
     const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -16,6 +17,12 @@ export default function AdminProductsPage() {
     const [search, setSearch] = useState('');
     const [deleteTarget, setDeleteTarget] = useState<AdminProduct | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-product-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
     const [page, setPage] = useState(1);
     const perPage = 12;
 
@@ -271,8 +278,8 @@ export default function AdminProductsPage() {
                                         </td>
 
                                         {/* Name */}
-                                        <td style={{ padding: '12px 16px', maxWidth: 250 }}>
-                                            <div style={{
+                                        <td style={{ padding: '12px 16px', maxWidth: 280 }}>
+                                            <div title={product.name} style={{
                                                 fontWeight: 500,
                                                 whiteSpace: 'nowrap',
                                                 overflow: 'hidden',

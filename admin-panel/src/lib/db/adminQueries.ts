@@ -1251,9 +1251,9 @@ export async function getAdminUsers(filters: AdminUsersFilter = {}): Promise<{
     const page = Math.max(1, Number(filters.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
 
-    // Base query
+    // Base query: all customer accounts (strictly excluding staff/admin)
     const query: Record<string, unknown> = {
-        role: { $in: ['customer', 'user'] },
+        role: { $nin: ['admin', 'superadmin'] },
     };
 
     if (filters.status && filters.status !== 'all') {
@@ -1280,6 +1280,7 @@ export async function getAdminUsers(filters: AdminUsersFilter = {}): Promise<{
             { fullName: searchRegex },
             { displayName: searchRegex },
             { email: searchRegex },
+            { clerkId: searchRegex },
         ];
         if (normalized) {
             orConditions.push({ phone: normalized });

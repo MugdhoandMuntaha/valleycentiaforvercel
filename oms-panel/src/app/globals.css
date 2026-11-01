@@ -62,10 +62,7 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-  overflow-x: hidden;
-}
+html {}
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

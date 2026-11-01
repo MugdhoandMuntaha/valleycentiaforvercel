@@ -9,6 +9,7 @@ import {
     getAdminCoupons, createCoupon, updateCoupon, deleteCoupon,
 } from '@/lib/db/adminQueries';
 import type { AdminCoupon, CouponFormData } from '@/lib/db/adminQueries';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 
 /* ===== Default form state ===== */
 const emptyForm: CouponFormData = {
@@ -33,6 +34,18 @@ export default function AdminCouponsPage() {
     /* Delete state */
     const [deleteTarget, setDeleteTarget] = useState<AdminCoupon | null>(null);
     const [deleting, setDeleting] = useState(false);
+
+    useOverlayHistory({
+        overlayId: 'admin-coupon-form-modal',
+        isOpen: modalOpen,
+        onClose: () => setModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'admin-coupon-delete-dialog',
+        isOpen: Boolean(deleteTarget),
+        onClose: () => setDeleteTarget(null),
+    });
 
     useEffect(() => { loadCoupons(); }, []);
 
