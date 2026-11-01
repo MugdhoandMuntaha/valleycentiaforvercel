@@ -14,6 +14,7 @@ node_modules/
 # testing & coverage
 /coverage
 *.lcov
+*.log
 
 # next.js & build outputs
 .next/
@@ -25,7 +26,10 @@ node_modules/
 # misc & OS
 .DS_Store
 Thumbs.db
+desktop.ini
 *.pem
+*.key
+*.cert
 
 # debug logs
 npm-debug.log*
@@ -38,8 +42,7 @@ yarn-error.log*
 !.env.example
 !**/.env.example
 
-
-# vercel
+# vercel & hosting
 .vercel
 
 # typescript build info
@@ -49,5 +52,15 @@ next-env.d.ts
 # clerk configuration
 /.clerk/
 
-# temporary and audit scratch files
+# database backups, dumps, and temporary audit files
+dump/
+backups/
+*.dump
+*.sql
+*.csv.bak
 image-sizes.csv
+backup_*.json
+
+# user uploads (prevent untracked dynamic uploads from cluttering repo)
+public/uploads/*
+!public/uploads/.gitkeep
