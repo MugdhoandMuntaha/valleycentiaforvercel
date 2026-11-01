@@ -1,14 +1,21 @@
 'use client';
 
-import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { Suspense } from 'react';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
+function ScrollRestorationInner() {
+    useScrollRestoration();
+    return null;
+}
+
+/**
+ * Universal scroll restoration manager mounted in the root layout.
+ * Wrapped in Suspense so Next.js static generation bails out cleanly.
+ */
 export default function ScrollToTop() {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-
-  return null;
+    return (
+        <Suspense fallback={null}>
+            <ScrollRestorationInner />
+        </Suspense>
+    );
 }
