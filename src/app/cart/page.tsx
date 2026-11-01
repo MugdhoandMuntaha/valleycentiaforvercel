@@ -18,9 +18,11 @@ import {
     Check,
 } from 'lucide-react';
 import { useCart } from '@/lib/CartContext';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import { CartPageSkeleton } from '@/components/Skeletons';
 import { getProductCards, getSiteSetting, getActiveCoupons, type ProductCard as ProductCardType, type Coupon } from '@/lib/db/queries';
 import ProductCard from '@/components/ProductCard';
+import ClampedText from '@/components/common/ClampedText';
 import type { SectionProduct } from '@/data/homeSections';
 
 function toSectionProduct(p: ProductCardType): SectionProduct {
@@ -63,6 +65,12 @@ export default function CartPage() {
 
     // Delete Confirmation State
     const [confirmDeleteState, setConfirmDeleteState] = useState<{ isOpen: boolean; itemId: string; itemSize?: string; itemName: string } | null>(null);
+
+    useOverlayHistory({
+        overlayId: 'cart-delete-dialog',
+        isOpen: Boolean(confirmDeleteState?.isOpen),
+        onClose: () => setConfirmDeleteState(null),
+    });
 
     const handleRemoveClick = (itemId: string, itemSize: string | undefined, itemName: string) => {
         setConfirmDeleteState({ isOpen: true, itemId, itemSize, itemName });
@@ -326,14 +334,20 @@ export default function CartPage() {
                                     {/* Details */}
                                     <div className="cart-item-details" style={{ flex: 1, minWidth: 0 }}>
                                         <Link href={`/product/${item.slug}`} style={{ textDecoration: 'none' }}>
-                                            <h3 style={{
-                                                fontSize: '14px', fontWeight: 600, color: '#1a1a1a',
-                                                lineHeight: 1.4, marginBottom: '4px',
-                                                display: '-webkit-box', WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                                            }}>
+                                            <ClampedText
+                                                as="h3"
+                                                lines={2}
+                                                title={item.name}
+                                                style={{
+                                                    fontSize: '14px',
+                                                    fontWeight: 600,
+                                                    color: '#1a1a1a',
+                                                    lineHeight: 1.4,
+                                                    marginBottom: '4px',
+                                                }}
+                                            >
                                                 {item.name}
-                                            </h3>
+                                            </ClampedText>
                                         </Link>
                                         {item.size && (
                                             <p style={{ fontSize: '12px', color: '#888', marginBottom: 0 }}>

@@ -40,6 +40,7 @@ import {
     MapPin,
     Flag,
     AlertCircle,
+    Lock,
 } from 'lucide-react';
 import {
     getProductPageData,
@@ -53,13 +54,17 @@ import {
     type Review
 } from '@/lib/db/queries';
 import { useCart } from '@/lib/CartContext';
+import { normalizeSize } from '@/lib/cartUtils';
 import { useWishlist } from '@/lib/WishlistContext';
 import { useAuth } from '@/lib/AuthContext';
 import { ProductDetailSkeleton } from '@/components/Skeletons';
 import ProductCard from '@/components/ProductCard';
 import ProductBadge from '@/components/common/ProductBadge';
+import ClampedText from '@/components/common/ClampedText';
+import ExpandableText from '@/components/common/ExpandableText';
 import StickyActionBar from '@/components/product/StickyActionBar';
 import ReviewImageGalleryModal from '@/components/product/ReviewImageGalleryModal';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import type { SectionProduct } from '@/data/homeSections';
 
 /* ===== Local Display Types (matches existing UI) ===== */
@@ -290,7 +295,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ slug: 
             const reviewsEl = document.getElementById('reviews');
             if (reviewsEl) {
                 clearInterval(timer);
-                reviewsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                reviewsEl.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
 
                 // If hash was dropped (e.g. during OAuth provider round-trip), restore #reviews
                 if (window.location.hash !== '#reviews') {
@@ -411,6 +416,12 @@ function ImageGallery({ images, title, badges }: { images: string[]; title: stri
 
     const goNext = () => setLightboxIndex(i => (i + 1) % images.length);
     const goPrev = () => setLightboxIndex(i => (i - 1 + images.length) % images.length);
+
+    useOverlayHistory({
+        overlayId: 'product-image-lightbox',
+        isOpen: showLightbox,
+        onClose: closeLightbox,
+    });
 
     // Keyboard navigation
     useEffect(() => {
@@ -745,9 +756,9 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             slug: product.slug,
             name: product.title,
             image: product.images[0],
-            price: currentSize.price,
+            price: currentSize ? currentSize.price : product.price,
             originalPrice: product.originalPrice,
-            size: currentSize.label,
+            size: normalizeSize(currentSize?.label),
             stockQuantity: currentSize.stockQuantity,
         }, quantity);
         setShowAdded(true);
@@ -766,9 +777,9 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             slug: product.slug,
             name: product.title,
             image: product.images[0],
-            price: currentSize.price,
+            price: currentSize ? currentSize.price : product.price,
             originalPrice: product.originalPrice,
-            size: currentSize.label,
+            size: normalizeSize(currentSize?.label),
             stockQuantity: currentSize.stockQuantity,
         }, quantity);
         router.push('/checkout');
@@ -798,17 +809,29 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
             </span>
 
             {/* Title */}
-            <h1 style={{
-                fontFamily: "'Outfit', sans-serif", fontSize: '24px', fontWeight: 700,
-                color: '#1a1a1a', lineHeight: 1.25, marginBottom: '3px',
-            }}>
+            <ClampedText
+                as="h1"
+                lines={3}
+                title={product.title}
+                style={{
+                    fontFamily: "'Outfit', sans-serif", fontSize: '24px', fontWeight: 700,
+                    color: '#1a1a1a', lineHeight: 1.25, marginBottom: '3px',
+                }}
+            >
                 {product.title}
-            </h1>
+            </ClampedText>
 
             {/* Subtitle */}
-            <p style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}>
-                {product.subtitle}
-            </p>
+            {product.subtitle && (
+                <ClampedText
+                    as="p"
+                    lines={1}
+                    title={product.subtitle}
+                    style={{ fontSize: '13px', color: '#888', marginBottom: '10px' }}
+                >
+                    {product.subtitle}
+                </ClampedText>
+            )}
 
             {/* Rating Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
@@ -823,10 +846,10 @@ function ProductInfo({ product, freeShippingThreshold }: { product: ProductDetai
                     href="#reviews"
                     onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' });
+                        document.getElementById('reviews')?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
                         setTimeout(() => {
-                            document.getElementById('review-body-textarea')?.focus();
-                        }, 300);
+                            document.getElementById('review-body-textarea')?.focus({ preventScroll: true });
+                        }, 100);
                     }}
                     style={{ fontSize: '12px', color: '#888', textDecoration: 'underline', cursor: 'pointer' }}
                 >
@@ -1165,7 +1188,13 @@ function TabbedContent({ product }: { product: ProductDetail }) {
                         color: '#555', maxWidth: '800px',
                         wordBreak: 'break-word', overflowWrap: 'anywhere',
                     }}>
-                        {textContent[activeTab]}
+                        <ExpandableText
+                            key={`${product.id}-${activeTab}`}
+                            content={textContent[activeTab]}
+                            lines={3}
+                            moreLabel="See more"
+                            lessLabel="See less"
+                        />
                     </div>
                 </motion.div>
             </AnimatePresence>
@@ -1328,8 +1357,59 @@ function ReviewsSection({
     const [activeMenuReviewId, setActiveMenuReviewId] = useState<string | null>(null);
 
     // Review callback destination & sessionStorage preservation
-    const reviewReturnUrl = `/product/${product.slug}?section=reviews#reviews`;
-    const signInReturnUrl = `/signin?callbackUrl=${encodeURIComponent(reviewReturnUrl)}`;
+    const reviewReturnUrl = `/product/${product.slug}?openReviewForm=true#reviews`;
+    const signInReturnUrl = `/auth/sign-in?redirect_url=${encodeURIComponent(reviewReturnUrl)}&callbackUrl=${encodeURIComponent(reviewReturnUrl)}`;
+
+    // Overlay history management for review dialogs (delete confirmation & report)
+    useOverlayHistory({
+        overlayId: 'delete-review-dialog',
+        isOpen: Boolean(deletingReview),
+        onClose: () => {
+            if (!isDeletingReview) setDeletingReview(null);
+        },
+    });
+
+    useOverlayHistory({
+        overlayId: 'report-review-dialog',
+        isOpen: Boolean(reportingReview),
+        onClose: () => {
+            if (!isSubmittingReport) setReportingReview(null);
+        },
+    });
+
+    // Handle post-login return with openReviewForm=true, hash #reviews, or pending draft intent
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const checkReviewIntent = () => {
+            const params = new URLSearchParams(window.location.search);
+            const hasParamIntent = params.get('openReviewForm') === 'true';
+            const hasHashIntent = window.location.hash === '#reviews' || window.location.hash === '#write-review-container';
+            const pendingIntent = sessionStorage.getItem(`pending_review_intent_${product.id}`);
+
+            if (hasParamIntent || pendingIntent || (hasHashIntent && !isWriteOpen)) {
+                setIsWriteOpen(true);
+                sessionStorage.removeItem(`pending_review_intent_${product.id}`);
+
+                const timer = setTimeout(() => {
+                    const el = document.getElementById('write-review-container') || document.getElementById('reviews');
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
+                    }
+                }, 200);
+
+                if (params.has('openReviewForm')) {
+                    params.delete('openReviewForm');
+                    const cleanSearch = params.toString() ? `?${params.toString()}` : '';
+                    window.history.replaceState({}, '', `${window.location.pathname}${cleanSearch}${window.location.hash || '#reviews'}`);
+                }
+
+                return () => clearTimeout(timer);
+            }
+        };
+
+        checkReviewIntent();
+    }, [product.id, product.slug, isWriteOpen]);
 
     // Restore draft review from sessionStorage on mount or product change
     useEffect(() => {
@@ -1359,6 +1439,7 @@ function ReviewsSection({
         try {
             if (reviewForm.title || reviewForm.body || reviewForm.rating !== 5) {
                 sessionStorage.setItem(`pending_review_${product.id}`, JSON.stringify(reviewForm));
+                                                                sessionStorage.setItem(`pending_review_intent_${product.id}`, 'true');
             }
         } catch (e) {
             console.error('Failed to save review draft to sessionStorage', e);
@@ -1652,11 +1733,13 @@ function ReviewsSection({
     };
 
     const handleSubmitReview = async () => {
-        const authorId = user?.id || (process.env.NODE_ENV !== 'production' ? 'dev-guest-user' : null);
-        if (!authorId) return;
+        if (!user?.id) {
+            setSubmitError('Authentication required. Please log in to write a review.');
+            return;
+        }
 
         if (userExistingReview) {
-            setSubmitError('You have already reviewed this.');
+            setSubmitError('You have already reviewed this product.');
             return;
         }
 
@@ -1673,13 +1756,13 @@ function ReviewsSection({
         setSubmitting(true);
         setSubmitError(null);
 
-        const authorName = profile?.full_name || profile?.display_name || user?.fullName || user?.displayName || user?.name || (user?.email ? user.email.split('@')[0] : null) || 'Anonymous';
+        const authorName = profile?.full_name || profile?.display_name || user?.fullName || user?.displayName || user?.name || (user?.email ? user.email.split('@')[0] : 'Customer');
         const finalLocation = (userDistrict || reviewForm.location || '').trim() || null;
 
         const { error, reviewId, isVerified } = await submitReview({
             product_id: product.id,
-            user_id: authorId,
-            user_name: authorName !== 'Anonymous' ? authorName : null,
+            user_id: user.id,
+            user_name: authorName,
             location: finalLocation,
             rating: reviewForm.rating,
             title: reviewForm.title.trim(),
@@ -1697,7 +1780,7 @@ function ReviewsSection({
             const newReview: Review = {
                 id: reviewId || 'temp-' + Date.now(),
                 product_id: product.id,
-                user_id: authorId,
+                user_id: user.id,
                 rating: reviewForm.rating,
                 title: reviewForm.title.trim() || null,
                 body: reviewForm.body.trim() || null,
@@ -1830,7 +1913,7 @@ function ReviewsSection({
         if (typeof window !== 'undefined') {
             const el = document.getElementById(`review-${review.id}`);
             if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
             }
         }
     };
@@ -2079,7 +2162,7 @@ function ReviewsSection({
                                         onClick={() => {
                                             setSubmitted(false);
                                             setIsWriteOpen(true);
-                                            document.getElementById('write-review-container')?.scrollIntoView({ behavior: 'smooth' });
+                                            document.getElementById('write-review-container')?.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
                                         }}
                                         style={{
                                             width: '100%', padding: '11px', background: '#1a1a1a', color: '#fff',
@@ -2095,6 +2178,7 @@ function ReviewsSection({
                                         onClick={() => {
                                             if (typeof window !== 'undefined') {
                                                 sessionStorage.setItem(`pending_review_${product.id}`, JSON.stringify(reviewForm));
+                                                                sessionStorage.setItem(`pending_review_intent_${product.id}`, 'true');
                                             }
                                         }}
                                         style={{
@@ -2414,6 +2498,7 @@ function ReviewsSection({
                                                             onClick={() => {
                                                                 if (typeof window !== 'undefined') {
                                                                     sessionStorage.setItem(`pending_review_${product.id}`, JSON.stringify(reviewForm));
+                                                                sessionStorage.setItem(`pending_review_intent_${product.id}`, 'true');
                                                                 }
                                                             }}
                                                             style={{ color: '#2e7d32', fontWeight: 700, textDecoration: 'underline' }}
@@ -2427,6 +2512,7 @@ function ReviewsSection({
                                                         onClick={() => {
                                                             if (typeof window !== 'undefined') {
                                                                 sessionStorage.setItem(`pending_review_${product.id}`, JSON.stringify(reviewForm));
+                                                                sessionStorage.setItem(`pending_review_intent_${product.id}`, 'true');
                                                             }
                                                         }}
                                                         style={{
@@ -2448,7 +2534,7 @@ function ReviewsSection({
                             {/* Fixed-Height Vertically Scrollable Reviews Area with Pinned Header */}
                             <div
                                 ref={scrollContainerRef}
-                                className="reviews-scroll-area"
+                                className="reviews-scroll-area" data-preserve-scroll="pdp-reviews-scroll"
                                 tabIndex={0}
                                 role="region"
                                 aria-label="Customer reviews"
@@ -2640,14 +2726,13 @@ function ReviewsSection({
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {displayedReviews.map(review => {
                                         const isAuthor = Boolean(user?.id && review.user_id === user.id);
-                                        const isAdmin = user?.role === 'admin';
-                                        const isDev = process.env.NODE_ENV !== 'production';
+                                        const isAdmin = user?.role === 'admin' || (user?.role as string) === 'superadmin';
                                         const canManage = Boolean(isAuthor || isAdmin);
                                         const isEditing = editingReviewId === review.id;
                                         const isExpanded = expandedReviewIds.has(review.id);
                                         const bodyText = review.body || '';
                                         const isLong = bodyText.length > 180;
-                                        const avatarInitial = ((review.user_name || 'Anonymous').trim().charAt(0) || 'A').toUpperCase();
+                                        const avatarInitial = ((review.user_name || 'Customer').trim().charAt(0) || 'C').toUpperCase();
 
                                         return (
                                             <div
@@ -2655,8 +2740,8 @@ function ReviewsSection({
                                                 id={`review-${review.id}`}
                                                 className="review-card"
                                             >
-                                                {/* 3-dot action menu: Edit (Author), Delete (Author & Admin), Report (Other Customers) */}
-                                                {!isEditing && (
+                                                {/* 3-dot action menu: Rendered ONLY for logged-in users; author/admin can delete, others report */}
+                                                {!isEditing && Boolean(user?.id) && (
                                                     <div style={{ position: 'absolute', top: '18px', right: '18px' }}>
                                                         <button
                                                             type="button"
@@ -2748,18 +2833,31 @@ function ReviewsSection({
                                                         {avatarInitial}
                                                     </div>
                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                            <span style={{ fontWeight: 700, fontSize: '14px', color: '#1a1a1a' }}>
-                                                                {review.user_name || 'Anonymous'}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, maxWidth: '100%' }}>
+                                                            <span style={{
+                                                                fontWeight: 700,
+                                                                fontSize: '14px',
+                                                                color: '#1a1a1a',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                minWidth: 0,
+                                                            }}>
+                                                                {review.user_name || 'Customer'}
                                                             </span>
                                                             {review.is_verified && (
-                                                                <span style={{
-                                                                    display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                                                    fontSize: '11px', fontWeight: 700, color: '#2e7d32',
-                                                                    background: '#e8f5e9', padding: '2px 7px', borderRadius: '12px',
-                                                                }}>
-                                                                    <CheckCircle2 size={11} />
-                                                                    Verified Buyer
+                                                                <span
+                                                                    aria-label="Verified purchase"
+                                                                    title="Verified purchase"
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        flexShrink: 0,
+                                                                        color: '#16a34a',
+                                                                    }}
+                                                                >
+                                                                    <CheckCircle2 size={16} fill="#16a34a" color="#ffffff" strokeWidth={2.5} />
                                                                 </span>
                                                             )}
                                                         </div>
@@ -3011,16 +3109,7 @@ function ReviewsSection({
                                                     </>
                                                 )}
 
-                                                {/* Card Footer: Verified review metadata */}
-                                                <div style={{
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                                                    paddingTop: '10px', borderTop: '1px solid #f5f5f5', marginTop: '8px',
-                                                    fontSize: '12px',
-                                                }}>
-                                                    <span style={{ fontSize: '11px', color: '#aaa' }}>
-                                                        Verified Review
-                                                    </span>
-                                                </div>
+
                                             </div>
                                         );
                                     })}
@@ -3147,17 +3236,16 @@ function ReviewsSection({
                                             No reviews yet. Be the first to share your experience below!
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '6px' }}>
-                                            <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic' }}>verified review</span>
+                                            
                                         </div>
                                     </div>
                                 ) : (
                                     reviews.map(review => {
                                         const isAuthor = Boolean(user?.id && review.user_id === user.id);
-                                        const isAdmin = user?.role === 'admin';
-                                        const isDev = process.env.NODE_ENV !== 'production';
-                                        const canManage = isAuthor || isAdmin || isDev;
+                                        const isAdmin = user?.role === 'admin' || (user?.role as string) === 'superadmin';
+                                        const canManage = isAuthor || isAdmin;
                                         const isEditing = editingReviewId === review.id;
-                                        const authorInitial = ((review.user_name || 'Anonymous').trim().charAt(0) || 'A').toUpperCase();
+                                        const authorInitial = ((review.user_name || 'Customer').trim().charAt(0) || 'C').toUpperCase();
 
                                         return (
                                             <div key={review.id} className="mobile-review-card-item">
@@ -3166,7 +3254,7 @@ function ReviewsSection({
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                                                         <div style={{
                                                             width: '38px', height: '38px', borderRadius: '50%',
-                                                            background: getAvatarColor(review.user_name || 'Anonymous'),
+                                                            background: getAvatarColor(review.user_name || 'Customer'),
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             fontSize: '14px', fontWeight: 700, color: '#1a1a1a',
                                                             flexShrink: 0,
@@ -3174,8 +3262,34 @@ function ReviewsSection({
                                                             {authorInitial}
                                                         </div>
                                                         <div style={{ minWidth: 0, flex: 1 }}>
-                                                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1a1a1a', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {review.user_name || 'Anonymous'}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, maxWidth: '100%' }}>
+                                                                <span style={{
+                                                                    fontWeight: 700,
+                                                                    fontSize: '14px',
+                                                                    color: '#1a1a1a',
+                                                                    lineHeight: 1.2,
+                                                                    whiteSpace: 'nowrap',
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    minWidth: 0,
+                                                                }}>
+                                                                    {review.user_name || 'Customer'}
+                                                                </span>
+                                                                {review.is_verified && (
+                                                                    <span
+                                                                        aria-label="Verified purchase"
+                                                                        title="Verified purchase"
+                                                                        style={{
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            flexShrink: 0,
+                                                                            color: '#16a34a',
+                                                                        }}
+                                                                    >
+                                                                        <CheckCircle2 size={16} fill="#16a34a" color="#ffffff" strokeWidth={2.5} />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                             {review.location && (
                                                                 <div style={{ fontSize: '11px', color: '#888', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -3186,7 +3300,8 @@ function ReviewsSection({
                                                         </div>
                                                     </div>
 
-                                                    {/* Three dots ⋮ action menu */}
+                                                    {/* Three dots ⋮ action menu - ONLY rendered for logged-in users */}
+                                                    {Boolean(user?.id) && (
                                                     <div style={{ position: 'relative', flexShrink: 0 }}>
                                                         <button
                                                             type="button"
@@ -3311,6 +3426,7 @@ function ReviewsSection({
                                                             </div>
                                                         )}
                                                     </div>
+                                                    )}
                                                 </div>
 
                                                 {/* In-place Edit Form or Review Display */}
@@ -3549,15 +3665,7 @@ function ReviewsSection({
                                                             );
                                                         })()}
 
-                                                        {/* Bottom Row: 'verified review' */}
-                                                        <div style={{
-                                                            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                                                            marginTop: 'auto', paddingTop: '6px',
-                                                        }}>
-                                                            <span style={{ fontSize: '11px', color: '#888', fontStyle: 'italic' }}>
-                                                                verified review
-                                                            </span>
-                                                        </div>
+
                                                     </>
                                                 )}
                                             </div>
@@ -3635,6 +3743,68 @@ function ReviewsSection({
                                             <Edit3 size={14} />
                                             <span>Edit Your Review</span>
                                         </button>
+                                    </div>
+                                ) : !user?.id ? (
+                                    <div style={{
+                                        padding: '28px 20px',
+                                        background: '#fcfcfc',
+                                        borderRadius: '16px',
+                                        border: '1px solid #e5e7eb',
+                                        textAlign: 'center',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        margin: '8px 0',
+                                    }}>
+                                        <div style={{
+                                            width: '46px',
+                                            height: '46px',
+                                            borderRadius: '50%',
+                                            background: '#fef08a',
+                                            color: '#854d0e',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}>
+                                            <Lock size={22} />
+                                        </div>
+                                        <h3 style={{
+                                            fontFamily: "'Outfit', sans-serif",
+                                            fontSize: '18px',
+                                            fontWeight: 700,
+                                            color: '#1a1a1a',
+                                            margin: 0,
+                                        }}>
+                                            Log in to write a review
+                                        </h3>
+                                        <p style={{
+                                            fontSize: '13px',
+                                            color: '#6b7280',
+                                            margin: 0,
+                                            maxWidth: '300px',
+                                            lineHeight: 1.4,
+                                        }}>
+                                            Please sign in to share your rating, feedback, and photos with our community.
+                                        </p>
+                                        <a
+                                            href={signInReturnUrl}
+                                            style={{
+                                                marginTop: '6px',
+                                                padding: '11px 22px',
+                                                background: '#1a1a1a',
+                                                color: '#ffffff',
+                                                borderRadius: '10px',
+                                                fontSize: '13px',
+                                                fontWeight: 700,
+                                                textDecoration: 'none',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                            }}
+                                        >
+                                            <span>Log in to write a review</span>
+                                        </a>
                                     </div>
                                 ) : (
                                     <>
@@ -3811,6 +3981,7 @@ function ReviewsSection({
                                                     onClick={() => {
                                                         if (typeof window !== 'undefined') {
                                                             sessionStorage.setItem(`pending_review_${product.id}`, JSON.stringify(reviewForm));
+                                                                sessionStorage.setItem(`pending_review_intent_${product.id}`, 'true');
                                                         }
                                                     }}
                                                     style={{

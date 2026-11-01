@@ -106,19 +106,19 @@ describe('Sign-In & Sign-Up Switcher Callback URL Carryover', () => {
 describe('Review State Preservation & Destination Serialization', () => {
     it('builds canonical review return destination with both section query and hash anchor', () => {
         const slug = 'vitamin-c-moisturizer';
-        const reviewReturnUrl = `/product/${slug}?section=reviews#reviews`;
+        const reviewReturnUrl = `/product/${slug}?openReviewForm=true#reviews`;
         const encoded = encodeURIComponent(reviewReturnUrl);
-        const signInLink = `/signin?callbackUrl=${encoded}`;
+        const signInLink = `/auth/sign-in?redirect_url=${encoded}&callbackUrl=${encoded}`;
 
         assert.equal(
             signInLink,
-            '/signin?callbackUrl=%2Fproduct%2Fvitamin-c-moisturizer%3Fsection%3Dreviews%23reviews'
+            '/auth/sign-in?redirect_url=%2Fproduct%2Fvitamin-c-moisturizer%3FopenReviewForm%3Dtrue%23reviews&callbackUrl=%2Fproduct%2Fvitamin-c-moisturizer%3FopenReviewForm%3Dtrue%23reviews'
         );
 
         // When retrieved from searchParams and validated:
         const decoded = decodeURIComponent(encoded);
         const safeDestination = getSafeCallbackUrl(decoded);
-        assert.equal(safeDestination, '/product/vitamin-c-moisturizer?section=reviews#reviews');
+        assert.equal(safeDestination, '/product/vitamin-c-moisturizer?openReviewForm=true#reviews');
     });
 
     it('serializes and deserializes pending review draft without loss of rating or text', () => {

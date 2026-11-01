@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Plus, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useCart } from '@/lib/CartContext';
+import ClampedText from '@/components/common/ClampedText';
 
 export interface TransformationCard {
     id: number | string;
@@ -323,21 +324,21 @@ export default function VisibleChange({ items }: VisibleChangeProps) {
 
                                     {/* Product Details */}
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <p
+                                        <ClampedText
+                                            as="p"
+                                            lines={1}
+                                            title={item.productName}
                                             className="vc-product-name"
                                             style={{
                                                 fontFamily: "'Inter', sans-serif",
                                                 fontSize: '11px',
                                                 fontWeight: 600,
                                                 color: '#1a1a1a',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
                                                 marginBottom: '3px',
                                             }}
                                         >
                                             {item.productName}
-                                        </p>
+                                        </ClampedText>
                                         <div
                                             style={{
                                                 display: 'flex',

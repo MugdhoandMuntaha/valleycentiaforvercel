@@ -1,14 +1,23 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { SignIn } from '@clerk/nextjs';
+import { Suspense, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { SignIn, useUser } from '@clerk/nextjs';
 import { getSafeCallbackUrl } from '@/lib/auth-helpers';
 
 function SignInContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
+    const { isSignedIn, isLoaded } = useUser();
     const rawCallback = searchParams.get('callbackUrl') || searchParams.get('redirect_url');
     const safeCallback = getSafeCallbackUrl(rawCallback, '');
+
+    // Prevent back-button loop: if user is already authenticated, replace route directly to destination
+    useEffect(() => {
+        if (isLoaded && isSignedIn) {
+            router.replace(safeCallback || '/');
+        }
+    }, [isLoaded, isSignedIn, safeCallback, router]);
 
     // Forward callback destination to Sign Up if user switches to sign-up
     const signUpUrl = safeCallback

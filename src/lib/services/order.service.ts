@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import connectToDatabase from '@/lib/mongodb';
 import Order from '@/lib/models/Order';
 import CartItem from '@/lib/models/CartItem';
+import User from '@/lib/models/User';
+import { normalizePhoneNumber } from '@/lib/phone';
 import { updateStockForOrder, restoreStockForOrder } from '@/lib/db/queries';
 import { validateAndCalculateOrder, IncomingOrderItem, VerifiedOrderCalculation } from '@/lib/orderValidation';
 import { jobQueue } from '@/lib/queue/jobQueue';
@@ -229,6 +231,18 @@ export class OrderService {
         // 5. Clear guest or user database cart
         if (!isGuest && params.userId) {
             await CartItem.deleteMany({ userId: params.userId });
+            const normPhone = params.address?.phone ? normalizePhoneNumber(params.address.phone) : null;
+            await User.findOneAndUpdate(
+                { clerkId: params.userId },
+                {
+                    $set: {
+                        ...(normPhone ? { phone: normPhone } : {}),
+                        ...(params.address?.full_name ? { fullName: params.address.full_name } : {}),
+                        ...(params.email ? { email: params.email } : {}),
+                        lastLoginAt: new Date(),
+                    },
+                }
+            ).catch(() => {});
         }
 
         // 6. Enqueue asynchronous background jobs (non-blocking)
@@ -432,6 +446,21 @@ export class OrderService {
             }
         } else {
             gatewayError = 'Payment gateway credentials are not configured';
+        }
+
+        if (!isGuest && params.userId) {
+            const normPhone = params.address?.phone ? normalizePhoneNumber(params.address.phone) : null;
+            await User.findOneAndUpdate(
+                { clerkId: params.userId },
+                {
+                    $set: {
+                        ...(normPhone ? { phone: normPhone } : {}),
+                        ...(params.address?.full_name ? { fullName: params.address.full_name } : {}),
+                        ...(params.email ? { email: params.email } : {}),
+                        lastLoginAt: new Date(),
+                    },
+                }
+            ).catch(() => {});
         }
 
         jobQueue.enqueue('AUDIT_LOG', {

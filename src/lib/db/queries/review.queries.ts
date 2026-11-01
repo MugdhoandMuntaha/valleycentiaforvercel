@@ -46,7 +46,7 @@ export async function getProductReviews(productId: string): Promise<ReviewData[]
         productId,
         isApproved: true,
         isDeleted: { $ne: true },
-        status: { $ne: 'deleted' },
+        status: { $nin: ['deleted', 'hidden'] },
     })
         .sort({ createdAt: -1 })
         .lean();
@@ -130,7 +130,7 @@ export async function getProductReviews(productId: string): Promise<ReviewData[]
             is_verified: review.isVerified,
             helpful_count: review.helpfulCount,
             created_at: review.createdAt.toISOString(),
-            user_name: reviewerName || 'Anonymous',
+            user_name: reviewerName || 'Customer',
             location: reviewerLocation || null,
             images: (review.images || []).map((img: any) => ({
                 url: img.url,
@@ -156,18 +156,42 @@ export async function submitReview(data: {
     body: string;
     location?: string | null;
     images?: { url: string; altText?: string | null; sortOrder?: number }[];
-}): Promise<{ error: string | null; reviewId?: string; isVerified?: boolean }> {
+    testAuthUser?: { userId: string; role?: string; email?: string };
+}): Promise<{ error: string | null; reviewId?: string; isVerified?: boolean; status?: number }> {
     await connectToDatabase();
     try {
+        // Enforce server session - unauthenticated or anonymous posting is prohibited
+        const sessionUser = await getSessionUser(data.testAuthUser);
+        if (!sessionUser || !sessionUser.userId || sessionUser.userId === 'dev-guest-user') {
+            return { error: 'Authentication required. Please log in to write a review.', status: 401 };
+        }
+
+        const userId = sessionUser.userId;
         const productId = data.productId || data.product_id || '';
-        const userId = data.userId || data.user_id || '';
-        const userName = data.userName || data.user_name || null;
+        if (!productId) {
+            return { error: 'Product ID is required', status: 400 };
+        }
+
+        // Fetch user from DB to resolve user identifiers and verify verified name
+        const user = await User.findOne({
+            $or: [
+                { clerkId: userId },
+                ...(mongoose.Types.ObjectId.isValid(userId) ? [{ _id: userId }] : [])
+            ]
+        }).lean();
+
+        const userIdentifiers = [userId];
+        if (user) {
+            if (user.clerkId) userIdentifiers.push(user.clerkId);
+            if (user._id) userIdentifiers.push(String(user._id));
+        }
 
         // Enforce one review per user per product
         const existingReview = await Review.findOne({
             productId,
-            userId,
+            userId: { $in: userIdentifiers },
             isDeleted: { $ne: true },
+            status: { $nin: ['deleted'] },
         });
 
         if (existingReview) {
@@ -178,10 +202,25 @@ export async function submitReview(data: {
         if (data.orderItemId) {
             isVerified = true;
         } else {
+            const productMatch: any[] = [{ 'orderItems.productId': productId }];
+            if (mongoose.Types.ObjectId.isValid(productId)) {
+                productMatch.push({ 'orderItems.productId': new mongoose.Types.ObjectId(productId) });
+            }
+
+            const userMatch: any[] = [{ userId: { $in: userIdentifiers } }];
+            if (user?.email) {
+                userMatch.push({ guestEmail: user.email.toLowerCase() });
+            }
+            if (user?.phone) {
+                userMatch.push({ guestPhone: user.phone });
+            }
+
             const hasPurchased = await Order.exists({
-                userId,
-                'items.productId': productId,
-                status: 'delivered',
+                $and: [
+                    { $or: userMatch },
+                    { $or: productMatch },
+                    { status: { $in: ['confirmed', 'processing', 'shipped', 'in_transit', 'delivered'] } },
+                ],
             });
             isVerified = Boolean(hasPurchased);
         }
@@ -196,10 +235,11 @@ export async function submitReview(data: {
             } catch {}
         }
 
+        const reviewerDisplayName = user?.fullName || user?.displayName || data.userName || data.user_name || "Customer";
         const createdReview = await Review.create({
             productId,
             userId,
-            userName,
+            userName: reviewerDisplayName,
             location: reviewerLocation,
             orderItemId: data.orderItemId || null,
             rating: data.rating,
@@ -281,7 +321,20 @@ export async function deleteReview(params: {
         }
 
         // 3. Determine permissions
-        const isAuthor = review.userId === sessionUserId;
+        // Resolve author IDs: sessionUserId, clerkId, and Mongo _id
+        const isMongoId = mongoose.Types.ObjectId.isValid(sessionUserId);
+        const queryOr: any[] = [{ clerkId: sessionUserId }, { email: sessionUserId }];
+        if (isMongoId) {
+            queryOr.push({ _id: sessionUserId });
+        }
+        const user = await User.findOne({ $or: queryOr }).select('role email clerkId').lean();
+        const authorIds = [sessionUserId];
+        if (user) {
+            if (user.clerkId) authorIds.push(user.clerkId);
+            if (user._id) authorIds.push(String(user._id));
+        }
+
+        const isAuthor = authorIds.includes(String(review.userId));
         let isAdmin = false;
 
         // Check if role is admin via session or DB
@@ -289,16 +342,8 @@ export async function deleteReview(params: {
             isAdmin = true;
         } else if (isUserAdmin({ userId: sessionUserId, email: sessionUser.email, role: sessionUser.role })) {
             isAdmin = true;
-        } else {
-            const isMongoId = mongoose.Types.ObjectId.isValid(sessionUserId);
-            const queryOr: any[] = [{ clerkId: sessionUserId }, { email: sessionUserId }];
-            if (isMongoId) {
-                queryOr.push({ _id: sessionUserId });
-            }
-            const user = await User.findOne({ $or: queryOr }).select('role email').lean();
-            if (user && (user.role === 'admin' || (user.role as string) === 'superadmin' || isUserAdmin({ userId: sessionUserId, email: user.email, role: user.role }))) {
-                isAdmin = true;
-            }
+        } else if (user && (user.role === 'admin' || (user.role as string) === 'superadmin' || isUserAdmin({ userId: sessionUserId, email: user.email, role: user.role }))) {
+            isAdmin = true;
         }
 
         if (!isAuthor && !isAdmin) {

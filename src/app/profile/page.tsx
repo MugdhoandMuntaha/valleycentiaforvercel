@@ -11,6 +11,7 @@ import {
     Plus, Trash2, Star, X, Home, Briefcase, ChevronRight, Eye, EyeOff, Clock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import { useCart } from '@/lib/CartContext';
 import { ProfilePageSkeleton } from '@/components/Skeletons';
 import { useWishlist } from '@/lib/WishlistContext';
@@ -20,6 +21,7 @@ import {
 } from '@/lib/db/queries';
 import type { UserAddress, AddressFormData, UserOrder, ProductCard as ProductCardType } from '@/lib/db/queries';
 import ProductCard from '@/components/ProductCard';
+import ClampedText from '@/components/common/ClampedText';
 
 /* ===== Tab types ===== */
 type Tab = 'profile' | 'orders' | 'wishlist' | 'addresses' | 'security';
@@ -42,6 +44,35 @@ export default function ProfilePage() {
     /* ===== Tab ===== */
     const [activeTab, setActiveTab] = useState<Tab>('profile');
 
+    // Sync sub-tabs with URL query & browser back/forward history
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab') as Tab | null;
+        if (tabParam && ['profile', 'addresses', 'orders', 'wishlist', 'security'].includes(tabParam)) {
+            setActiveTab(tabParam);
+        }
+
+        const handlePopState = () => {
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentTab = (currentParams.get('tab') as Tab) || 'profile';
+            if (['profile', 'addresses', 'orders', 'wishlist', 'security'].includes(currentTab)) {
+                setActiveTab(currentTab);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const handleTabChange = (newTab: Tab) => {
+        setActiveTab(newTab);
+        if (typeof window !== 'undefined') {
+            const url = newTab === 'profile' ? window.location.pathname : `${window.location.pathname}?tab=${newTab}`;
+            window.history.pushState({ tab: newTab }, '', url);
+        }
+    };
+
     /* ===== Profile fields ===== */
     const [fullName, setFullName] = useState('');
     const [displayName, setDisplayName] = useState('');
@@ -62,6 +93,18 @@ export default function ProfilePage() {
     const [addrSaving, setAddrSaving] = useState(false);
     const [addrError, setAddrError] = useState('');
     const [addrDeleteId, setAddrDeleteId] = useState<string | null>(null);
+
+    useOverlayHistory({
+        overlayId: 'profile-address-form-modal',
+        isOpen: addrModalOpen,
+        onClose: () => setAddrModalOpen(false),
+    });
+
+    useOverlayHistory({
+        overlayId: 'profile-address-delete-dialog',
+        isOpen: Boolean(addrDeleteId),
+        onClose: () => setAddrDeleteId(null),
+    });
 
     /* ===== Orders ===== */
     const [orders, setOrders] = useState<UserOrder[]>([]);
@@ -308,7 +351,7 @@ export default function ProfilePage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.4, delay: 0.1 }}
                             onClick={() => {
-                                if ('tab' in stat && stat.tab) setActiveTab(stat.tab);
+                                if ('tab' in stat && stat.tab) handleTabChange(stat.tab);
                                 else if ('href' in stat && stat.href) router.push(stat.href);
                             }}
                             style={{
@@ -338,7 +381,7 @@ export default function ProfilePage() {
                         return (
                             <button
                                 key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
+                                onClick={() => handleTabChange(tab.key)}
                                 className="profile-tab-btn"
                                 style={{
                                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -415,7 +458,9 @@ export default function ProfilePage() {
                                                 >
                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-                                                            <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>{order.order_number}</span>
+                                                            <span style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>
+    <span className="selectable">{order.order_number}</span>
+</span>
                                                             <span style={{
                                                                 fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
                                                                 padding: '2px 8px', borderRadius: 10, letterSpacing: 0.5,
@@ -467,7 +512,14 @@ export default function ProfilePage() {
                                                                     )}
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                                         <Link href={`/product/${item.product_slug}`} style={{ textDecoration: 'none' }}>
-                                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 2 }}>{item.product_name}</div>
+                                                                            <ClampedText
+                                                                                as="div"
+                                                                                lines={2}
+                                                                                title={item.product_name}
+                                                                                style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 2 }}
+                                                                            >
+                                                                                {item.product_name}
+                                                                            </ClampedText>
                                                                         </Link>
                                                                         <div style={{ fontSize: 11, color: '#999' }}>
                                                                             {item.size && <span>Size: {item.size} · </span>}
@@ -772,11 +824,13 @@ export default function ProfilePage() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#444', marginBottom: 2 }}>{addr.full_name}</div>
-                                                    <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-                                                        {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}<br />
-                                                        {addr.city}, {addr.state} {addr.postal_code}<br />
-                                                        {addr.phone}
+                                                    <div>
+                                                        <div style={{ fontSize: 13, fontWeight: 600, color: '#444', marginBottom: 2 }}>{addr.full_name}</div>
+                                                        <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }} className="selectable">
+                                                            {addr.address_line_1}{addr.address_line_2 ? `, ${addr.address_line_2}` : ''}<br />
+                                                            {addr.city}, {addr.state} {addr.postal_code}<br />
+                                                            {addr.phone}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

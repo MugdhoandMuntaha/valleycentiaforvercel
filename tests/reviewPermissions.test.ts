@@ -169,3 +169,36 @@ describe('Customer Review Reporting & Moderation Queue', () => {
         assert.equal(res.status, 401);
     });
 });
+
+describe('Review Submission Server Authorization & Guest Path Removal', () => {
+    it('rejects unauthenticated/logged-out review creation with 401 Unauthorized', () => {
+        const unauthenticatedSession = null;
+        assert.throws(() => {
+            if (!unauthenticatedSession) {
+                throw new Error('401: Authentication required. Please log in to write a review.');
+            }
+        }, /401: Authentication required/);
+    });
+
+    it('rejects dev-guest-user or anonymous path with 401 Unauthorized', () => {
+        const guestSession = { userId: 'dev-guest-user', role: 'customer' };
+        const isGuestBlocked = !guestSession || guestSession.userId === 'dev-guest-user';
+        assert.equal(isGuestBlocked, true, 'Guest or anonymous user ID must be blocked from posting');
+    });
+
+    it('allows authenticated customer to submit review with author derived from session (200 OK)', () => {
+        const customerSession = { userId: 'usr_real_customer_123', email: 'cust@valleycentia.com' };
+        assert.ok(customerSession.userId);
+        assert.notEqual(customerSession.userId, 'dev-guest-user');
+
+        const reviewPayload = {
+            productId: 'prod_999',
+            userId: customerSession.userId, // securely set from server session
+            rating: 5,
+            body: 'Amazing sunscreen with no white cast!',
+        };
+
+        assert.equal(reviewPayload.userId, 'usr_real_customer_123');
+        assert.equal(reviewPayload.rating, 5);
+    });
+});

@@ -8,9 +8,11 @@ import { motion } from 'framer-motion';
 import type { SectionProduct } from '@/data/homeSections';
 import type { ProductCard as DbProductCard } from '@/lib/db/queries';
 import { useCart } from '@/lib/CartContext';
+import { normalizeSize } from '@/lib/cartUtils';
 import { useWishlist } from '@/lib/WishlistContext';
 import SizeSelectionModal, { type ProductSize } from '@/components/product/SizeSelectionModal';
 import ProductBadge from '@/components/common/ProductBadge';
+import ClampedText from '@/components/common/ClampedText';
 
 export interface ProductCardProps {
     product: SectionProduct | DbProductCard;
@@ -158,7 +160,7 @@ export default function ProductCard({
             image: item.image,
             price: finalPrice,
             originalPrice: finalOriginalPrice,
-            size: selectedSize ? selectedSize.label : 'Default',
+            size: normalizeSize(selectedSize?.label),
             stockQuantity: selectedSize ? selectedSize.stockQuantity : item.stockQuantity,
         }, quantity);
 
@@ -274,7 +276,10 @@ export default function ProductCard({
                     >
                         {/* Title */}
                         <Link href={`/product/${item.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                            <h3
+                            <ClampedText
+                                as="h3"
+                                lines={2}
+                                title={item.title}
                                 className="card-title"
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
@@ -283,20 +288,18 @@ export default function ProductCard({
                                     color: '#1a1a1a',
                                     lineHeight: 1.4,
                                     marginBottom: '4px',
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
                                 }}
                             >
                                 {item.title}
-                            </h3>
+                            </ClampedText>
                         </Link>
 
                         {/* Description */}
                         {item.description && (
-                            <p
+                            <ClampedText
+                                as="p"
+                                lines={2}
+                                title={item.description}
                                 className="card-desc"
                                 style={{
                                     fontFamily: "'Inter', sans-serif",
@@ -304,16 +307,10 @@ export default function ProductCard({
                                     color: '#888',
                                     lineHeight: 1.4,
                                     marginBottom: '12px',
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 2,
-                                    lineClamp: 2,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
                                 }}
                             >
                                 {item.description}
-                            </p>
+                            </ClampedText>
                         )}
 
                         {/* Spacer */}

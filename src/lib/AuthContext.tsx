@@ -92,6 +92,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [user, profileOverrides]);
 
+    // Automatically sync Clerk user with MongoDB upon login or session load
+    React.useEffect(() => {
+        if (!userId || !clerkUser) return;
+        const primaryEmail = clerkUser.primaryEmailAddress?.emailAddress || '';
+        const fullName = clerkUser.fullName || null;
+        const displayName = clerkUser.firstName || clerkUser.username || (primaryEmail ? primaryEmail.split('@')[0] : null);
+        const avatarUrl = clerkUser.imageUrl || null;
+        const phone = clerkUser.primaryPhoneNumber?.phoneNumber || null;
+
+        fetch('/api/auth/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: primaryEmail,
+                fullName,
+                displayName,
+                avatarUrl,
+                phone,
+            }),
+        }).catch(err => {
+            console.error('Failed to auto-sync Clerk user to MongoDB:', err);
+        });
+    }, [userId, clerkUser]);
+
     // Clerk manages sign-in/sign-up via its own UI.
     // These methods open the Clerk modal or redirect to Clerk's sign-in page.
     const signIn = useCallback(async (_email: string, _password: string) => {

@@ -203,7 +203,7 @@ export default function CODConfirmedPage() {
                         <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: 10, fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: 1 }}>Order No.</div>
                             <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 800, color: '#1a1a1a', marginTop: 2 }}>
-                                {order.orderNumber}
+                                <span className="selectable">{order.orderNumber}</span>
                             </div>
                             <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{orderDate}</div>
                         </div>
@@ -229,14 +229,14 @@ export default function CODConfirmedPage() {
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 2 }}>
                             {order.address.full_name}
                         </div>
-                        <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6 }}>
+                        <div style={{ fontSize: 13, color: '#666', lineHeight: 1.6 }} className="selectable">
                             {order.address.address_line_1}
                             {order.address.address_line_2 ? `, ${order.address.address_line_2}` : ''}
                             <br />
                             {order.address.city}, {order.address.state} {order.address.postal_code}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 12, color: '#999' }}>
-                            <Phone size={12} /> {order.address.phone}
+                            <Phone size={12} /> <span className="selectable">{order.address.phone}</span>
                         </div>
                     </div>
 

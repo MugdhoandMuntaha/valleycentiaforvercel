@@ -3,6 +3,43 @@ import { auth } from '@clerk/nextjs/server';
 import connectToDatabase from '@/lib/mongodb';
 import CartItem from '@/lib/models/CartItem';
 import Product from '@/lib/models/Product';
+import { normalizeSize } from '@/lib/cartUtils';
+
+interface ProductSizeDoc {
+    _id: unknown;
+    label: string;
+    price: number;
+    stockQuantity?: number;
+}
+
+interface ProductImageDoc {
+    url: string;
+    isPrimary?: boolean;
+}
+
+interface ProductPopulatedDoc {
+    _id: unknown;
+    slug: string;
+    name: string;
+    isDeleted?: boolean;
+    basePrice: number;
+    compareAtPrice?: number | null;
+    stockQuantity?: number;
+    sizes?: ProductSizeDoc[];
+    images?: ProductImageDoc[];
+}
+
+interface DbCartItemDoc {
+    productId?: ProductPopulatedDoc;
+    sizeId?: unknown;
+    quantity: number;
+}
+
+interface ClientCartItemInput {
+    id: string;
+    size?: string | null;
+    quantity?: number;
+}
 
 export async function GET() {
     try {
@@ -15,30 +52,30 @@ export async function GET() {
 
         const dbItems = await CartItem.find({ userId })
             .populate('productId')
-            .lean();
+            .lean() as unknown as DbCartItemDoc[];
 
-        const items = dbItems.map((item: any) => {
+        const items = dbItems.map((item) => {
             if (!item.productId) return null;
             const prod = item.productId;
             if (prod.isDeleted) return null;
 
             let price = prod.basePrice;
-            let originalPrice = prod.compareAtPrice || undefined;
-            let sizeLabel = undefined;
+            const originalPrice = prod.compareAtPrice || undefined;
+            let sizeLabel: string | undefined = undefined;
             let stockQuantity = prod.stockQuantity || 0;
 
-            if (item.sizeId && prod.sizes) {
-                const sz = prod.sizes.find((s: any) => String(s._id) === String(item.sizeId));
+            if (item.sizeId && prod.sizes && Array.isArray(prod.sizes)) {
+                const sz = prod.sizes.find((s) => String(s._id) === String(item.sizeId));
                 if (sz) {
                     price = sz.price;
-                    sizeLabel = sz.label;
+                    sizeLabel = normalizeSize(sz.label);
                     stockQuantity = sz.stockQuantity || 0;
                 }
             }
 
             let primaryImg = '/no-image.svg';
             if (prod.images && prod.images.length > 0) {
-                const primary = prod.images.find((img: any) => img.isPrimary) || prod.images[0];
+                const primary = prod.images.find((img) => img.isPrimary) || prod.images[0];
                 primaryImg = primary.url;
             }
 
@@ -72,41 +109,69 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const clientItems = body.items || [];
+        const clientItems: ClientCartItemInput[] = Array.isArray(body.items) ? body.items : [];
 
         await connectToDatabase();
 
-        // Clear existing cart items
-        await CartItem.deleteMany({ userId });
+        // If client sends empty items, clear cart
+        if (clientItems.length === 0) {
+            await CartItem.deleteMany({ userId });
+            return NextResponse.json({ success: true, count: 0 });
+        }
 
-        // Map and insert new ones
-        const toInsert = [];
+        // Fetch products in bulk
+        const productIds = clientItems.map((i) => i.id).filter(Boolean);
+        const products = await Product.find({ _id: { $in: productIds }, isDeleted: { $ne: true } }).lean() as unknown as ProductPopulatedDoc[];
+        const productMap = new Map(products.map((p) => [String(p._id), p]));
+
+        // Consolidate/deduplicate client items by (productId, sizeId) to guarantee idempotency and avoid duplicate key errors
+        const consolidated = new Map<string, { productId: unknown; sizeId: unknown; quantity: number }>();
+
         for (const item of clientItems) {
-            const prod = await Product.findOne({ _id: item.id, isDeleted: { $ne: true } }).lean();
+            if (!item || !item.id) continue;
+            const prod = productMap.get(String(item.id));
             if (!prod) continue;
 
-            let sizeId = null;
+            let sizeId: unknown = null;
             let availableStock = prod.stockQuantity || 0;
-            if (item.size && prod.sizes) {
-                const sz = prod.sizes.find((s: any) => s.label === item.size);
+            const normSize = normalizeSize(item.size);
+
+            if (normSize && prod.sizes && Array.isArray(prod.sizes)) {
+                const sz = prod.sizes.find((s) => s.label && s.label.toLowerCase() === normSize.toLowerCase());
                 if (sz) {
                     sizeId = sz._id;
                     availableStock = sz.stockQuantity || 0;
                 }
             }
 
-            const validQty = Math.max(1, Math.min(Number(item.quantity) || 1, availableStock > 0 ? availableStock : 10, 10));
+            const itemKey = `${String(prod._id)}_${sizeId ? String(sizeId) : 'none'}`;
+            const qty = Math.max(1, Number(item.quantity) || 1);
+            const maxAllowed = Math.min(availableStock > 0 ? availableStock : 10, 10);
 
-            toInsert.push({
-                userId,
-                productId: prod._id,
-                sizeId,
-                quantity: validQty,
-            });
+            const existing = consolidated.get(itemKey);
+            if (existing) {
+                // If client somehow posted duplicate items, consolidate their quantity up to max stock
+                existing.quantity = Math.max(1, Math.min(existing.quantity + qty, maxAllowed));
+            } else {
+                consolidated.set(itemKey, {
+                    productId: prod._id,
+                    sizeId,
+                    quantity: Math.max(1, Math.min(qty, maxAllowed)),
+                });
+            }
         }
 
+        const toInsert = Array.from(consolidated.values()).map(c => ({
+            userId,
+            productId: c.productId,
+            sizeId: c.sizeId,
+            quantity: c.quantity,
+        }));
+
+        // Atomically replace items for user
+        await CartItem.deleteMany({ userId });
         if (toInsert.length > 0) {
-            await CartItem.insertMany(toInsert);
+            await CartItem.insertMany(toInsert, { ordered: false });
         }
 
         return NextResponse.json({ success: true, count: toInsert.length });

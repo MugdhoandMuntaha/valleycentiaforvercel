@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useCart } from '@/lib/CartContext';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import { CheckoutPageSkeleton } from '@/components/Skeletons';
+import ClampedText from '@/components/common/ClampedText';
 import { getUserAddresses, createAddress, updateAddress, deleteAddress, getSiteSetting, getActiveCoupons } from '@/lib/db/queries';
 import type { UserAddress, AddressFormData, CouponData } from '@/lib/db/queries';
 
@@ -33,6 +35,12 @@ export default function CheckoutPage() {
     const [addrForm, setAddrForm] = useState<AddressFormData>(emptyAddress);
     const [addrSaving, setAddrSaving] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+    useOverlayHistory({
+        overlayId: 'checkout-delete-address-dialog',
+        isOpen: Boolean(deleteConfirmId),
+        onClose: () => setDeleteConfirmId(null),
+    });
     const [paying, setPaying] = useState(false);
     const [error, setError] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('cod');
@@ -344,6 +352,13 @@ export default function CheckoutPage() {
 
         if (!addr.full_name || !addr.phone || !addr.address_line_1 || !addr.city || !addr.state) {
             setError('Please fill all required delivery fields');
+            if (typeof document !== 'undefined') {
+                const firstInvalid = document.querySelector<HTMLElement>('input[required]:invalid, .co-input:invalid, .co-error');
+                if (firstInvalid) {
+                    firstInvalid.focus({ preventScroll: true });
+                    firstInvalid.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
+                }
+            }
             return;
         }
 
@@ -391,7 +406,7 @@ export default function CheckoutPage() {
                     }));
                     navigatingAway.current = true;
                     clearCart();
-                    window.location.href = '/checkout/cod-confirmed';
+                    window.location.replace('/checkout/cod-confirmed');
                 } else {
                     setError(data.error || 'Failed to place order');
                     setPaying(false);
@@ -651,9 +666,14 @@ export default function CheckoutPage() {
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: '16px' }}>
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-                                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0', fontFamily: "'Inter', sans-serif", lineHeight: 1.4 }}>
+                                        <ClampedText
+                                            as="h3"
+                                            lines={2}
+                                            title={item.name}
+                                            style={{ fontSize: '15px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px 0', fontFamily: "'Inter', sans-serif", lineHeight: 1.4 }}
+                                        >
                                             {item.name}
-                                        </h3>
+                                        </ClampedText>
                                     </div>
 
                                     <div style={{

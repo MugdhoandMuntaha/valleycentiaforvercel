@@ -7,6 +7,7 @@ import { Search, User, X, ChevronDown, Sparkles, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/AuthContext';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import { useSearch, type SearchProduct } from '@/hooks/useSearch';
 import type { NavLink } from './constants';
 
@@ -20,6 +21,11 @@ interface MobileMenuProps {
 export default function MobileMenu({ isOpen, onClose, navLinks, allProducts }: MobileMenuProps) {
     const { user, signOut } = useAuth();
     useBodyScrollLock(isOpen);
+    useOverlayHistory({
+        overlayId: 'mobile-menu-drawer',
+        isOpen,
+        onClose,
+    });
 
     const {
         searchQuery,

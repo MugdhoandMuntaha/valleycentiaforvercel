@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import type { SectionProduct } from '@/data/homeSections';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import QuantitySelector from './QuantitySelector';
 
 export type ProductSize = NonNullable<SectionProduct['sizes']>[number];
@@ -40,6 +41,11 @@ export default function SizeSelectionModal({
     }, []);
 
     useBodyScrollLock(isOpen);
+    useOverlayHistory({
+        overlayId: 'size-selection-modal',
+        isOpen,
+        onClose,
+    });
 
     if (!mounted || !isOpen) return null;
 

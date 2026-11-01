@@ -118,6 +118,7 @@ export default function Footer() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <a
                             href={`mailto:${contactEmail}`}
+                            className="selectable"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -134,6 +135,7 @@ export default function Footer() {
                         </a>
                         <a
                             href={`tel:${contactPhone}`}
+                            className="selectable"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -149,6 +151,7 @@ export default function Footer() {
                             {contactPhone}
                         </a>
                         <span
+                            className="selectable"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',

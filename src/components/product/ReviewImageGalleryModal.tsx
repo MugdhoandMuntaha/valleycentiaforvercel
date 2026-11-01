@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import { useOverlayHistory } from '@/hooks/useOverlayHistory';
 import styles from './ReviewImageGalleryModal.module.css';
 
 export interface ReviewImageGalleryModalProps {
@@ -95,6 +96,13 @@ export default function ReviewImageGalleryModal({
     // Body scroll lock prevents background scrolling and eliminates layout shift
     useBodyScrollLock(isOpen);
 
+    // Coordinate with browser history so back button/gesture closes lightbox instead of leaving page
+    useOverlayHistory({
+        overlayId: 'review-image-lightbox',
+        isOpen,
+        onClose,
+    });
+
     // Accessibility: Focus movement into modal on open and restoration on close
     useEffect(() => {
         if (!isOpen) return;
@@ -105,9 +113,9 @@ export default function ReviewImageGalleryModal({
         // Move focus into the viewer
         const timer = requestAnimationFrame(() => {
             if (closeButtonRef.current) {
-                closeButtonRef.current.focus();
+                closeButtonRef.current.focus({ preventScroll: true });
             } else if (modalRef.current) {
-                modalRef.current.focus();
+                modalRef.current.focus({ preventScroll: true });
             }
         });
 
@@ -115,7 +123,7 @@ export default function ReviewImageGalleryModal({
             cancelAnimationFrame(timer);
             // Restore focus back to the trigger on close
             if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
-                previousActiveElementRef.current.focus();
+                previousActiveElementRef.current.focus({ preventScroll: true });
             }
         };
     }, [isOpen]);
@@ -220,12 +228,12 @@ export default function ReviewImageGalleryModal({
                 if (e.shiftKey) {
                     if (document.activeElement === firstEl) {
                         e.preventDefault();
-                        lastEl.focus();
+                        lastEl.focus({ preventScroll: true });
                     }
                 } else {
                     if (document.activeElement === lastEl) {
                         e.preventDefault();
-                        firstEl.focus();
+                        firstEl.focus({ preventScroll: true });
                     }
                 }
             }

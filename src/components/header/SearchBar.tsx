@@ -9,6 +9,7 @@ import { useCart } from '@/lib/CartContext';
 import { useSearch, type SearchProduct } from '@/hooks/useSearch';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { popularChoices } from './constants';
+import ClampedText from '@/components/common/ClampedText';
 
 interface SearchBarProps {
     allProducts: SearchProduct[];
@@ -260,21 +261,21 @@ export default function SearchBar({ allProducts }: SearchBarProps) {
                                                         </div>
 
                                                         {/* Name */}
-                                                        <p style={{
-                                                            fontFamily: "'Inter', sans-serif",
-                                                            fontSize: '13px',
-                                                            fontWeight: 600,
-                                                            color: '#1a1a1a',
-                                                            lineHeight: 1.4,
-                                                            marginBottom: '8px',
-                                                            display: '-webkit-box',
-                                                            WebkitLineClamp: 2,
-                                                            WebkitBoxOrient: 'vertical',
-                                                            overflow: 'hidden',
-                                                            margin: '0 0 8px 0',
-                                                        }}>
+                                                        <ClampedText
+                                                            as="p"
+                                                            lines={2}
+                                                            title={product.name}
+                                                            style={{
+                                                                fontFamily: "'Inter', sans-serif",
+                                                                fontSize: '13px',
+                                                                fontWeight: 600,
+                                                                color: '#1a1a1a',
+                                                                lineHeight: 1.4,
+                                                                margin: '0 0 8px 0',
+                                                            }}
+                                                        >
                                                             {product.name}
-                                                        </p>
+                                                        </ClampedText>
 
                                                         {/* Price */}
                                                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '10px' }}>
